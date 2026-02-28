@@ -39,8 +39,16 @@
     <div class="col-md-3">
       <div class="card text-center shadow">
         <div class="card-body">
-          <h5>Total Pedia Medicines</h5>
+          <h5>Total Pediatric Medicines</h5>
           <h2 id="totalPedia">0</h2>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="card text-center shadow">
+        <div class="card-body">
+          <h5>Total Pediatric Stock Value</h5>
+          <h2 id="totalPediaValue">₱0.00</h2>
         </div>
       </div>
     </div>
@@ -95,7 +103,7 @@
 
   <!-- PEDIATRIC MEDICINE FORM -->
   <div class="card mb-4 shadow">
-    <div class="card-header bg-success text-white">Pediatric Medicine Form</div>
+    <div class="card-header bg-success text-white">Pediatric Medicine Fill-Up</div>
     <div class="card-body">
       <form id="pediaForm" class="row g-3">
         <div class="col-md-3">
@@ -117,17 +125,30 @@
           </select>
         </div>
         <div class="col-md-2">
-          <input type="number" class="form-control" id="pediaPrice" placeholder="Price" required>
+          <select class="form-select" id="pediaPriceSelect">
+            <option value="">Select Price</option>
+            <option value="100">Paracetamol Syrup - ₱100</option>
+            <option value="150">Amoxicillin Syrup - ₱150</option>
+            <option value="120">Vitamin C Drops - ₱120</option>
+          </select>
         </div>
         <div class="col-md-1">
+          <input type="number" class="form-control" id="pediaQty" placeholder="Qty" min="1" value="1">
+        </div>
+        <div class="col-md-2">
+          <input type="text" class="form-control fw-bold text-success" id="pediaTotal" placeholder="Total" readonly>
+        </div>
+        <div class="col-md-2">
           <button type="submit" class="btn btn-success w-100">Add</button>
         </div>
       </form>
+
       <div class="mt-3">
         <input type="text" class="form-control mb-2" id="pediaSearch" placeholder="Search Pediatric Medicines">
         <button class="btn btn-sm btn-outline-secondary" onclick="searchPedia()">Search</button>
         <button class="btn btn-sm btn-outline-success" onclick="exportPedia()">Export Excel</button>
       </div>
+
       <table class="table table-bordered table-hover mt-2">
         <thead class="table-light">
           <tr>
@@ -135,6 +156,8 @@
             <th>Milligram/ml</th>
             <th>Type</th>
             <th>Price</th>
+            <th>Quantity</th>
+            <th>Total</th>
           </tr>
         </thead>
         <tbody id="pediaTable"></tbody>
@@ -163,10 +186,6 @@
 
 </div>
 
-<!-- Bootstrap JS -->
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
-
-<!-- Firebase + JS -->
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.10.0/firebase-app.js";
 import { getDatabase, ref, push, onValue, update } from "https://www.gstatic.com/firebasejs/12.10.0/firebase-database.js";
@@ -185,36 +204,21 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
 
-/* ===== DATA ===== */
-let adultData={}, pediaData={}, totalAdultValue=0, totalAdultCount=0, totalPediaCount=0;
-
-/* ===== ADULT FORM ===== */
+/* ===== ADULT MEDICINE ===== */
+let adultData={};
 adultForm.addEventListener("submit", e=>{
   e.preventDefault();
   push(ref(db,"adult_medicine"),{
     name: adultName.value,
-    mg: adultMg.value+" "+adultType.value,
+    mg: adultMg.value + " " + adultType.value,
     price: adultPrice.value,
     qty: adultQty.value
   });
   adultForm.reset();
 });
 
-/* ===== PEDIA FORM ===== */
-pediaForm.addEventListener("submit", e=>{
-  e.preventDefault();
-  push(ref(db,"pedia_medicine"),{
-    name: pediaName.value,
-    mg: pediaMg.value+" "+pediaUnit.value,
-    type: pediaType.value,
-    price: pediaPrice.value
-  });
-  pediaForm.reset();
-});
-
-/* ===== ADULT TABLE ===== */
 onValue(ref(db,"adult_medicine"), snapshot=>{
-  adultTable.innerHTML=""; adultData={}; totalAdultValue=0; totalAdultCount=0;
+  adultTable.innerHTML=""; adultData={}; totalAdultCount=0; totalAdultValue=0;
   snapshot.forEach(child=>{
     adultData[child.key]=child.val();
     totalAdultCount++;
@@ -256,24 +260,54 @@ window.deductStock = (key,btn)=>{
   btn.previousElementSibling.value="";
 };
 
-/* ===== PEDIA TABLE ===== */
+/* ===== PEDIATRIC MEDICINE ===== */
+let pediaData={};
+const priceSelect = document.getElementById("pediaPriceSelect");
+const qtyInput = document.getElementById("pediaQty");
+const totalInput = document.getElementById("pediaTotal");
+function updateTotal(){
+  const price = parseFloat(priceSelect.value) || 0;
+  const qty = parseInt(qtyInput.value) || 1;
+  totalInput.value = "₱" + (price * qty);
+}
+priceSelect.addEventListener("change", updateTotal);
+qtyInput.addEventListener("input", updateTotal);
+
+pediaForm.addEventListener("submit", e=>{
+  e.preventDefault();
+  const data={
+    name: pediaName.value,
+    mg: pediaMg.value + " " + pediaUnit.value,
+    type: pediaType.value,
+    price: priceSelect.value,
+    quantity: qtyInput.value,
+    total: parseFloat(priceSelect.value)*parseInt(qtyInput.value)
+  };
+  push(ref(db,"pedia_medicine"),data);
+  pediaForm.reset();
+  totalInput.value="";
+});
+
 onValue(ref(db,"pedia_medicine"), snapshot=>{
-  pediaTable.innerHTML=""; pediaData={}; totalPediaCount=0;
+  pediaTable.innerHTML=""; pediaData={}; totalPediaCount=0; totalPediaValue=0;
   snapshot.forEach(child=>{
     pediaData[child.key]=child.val();
     totalPediaCount++;
+    totalPediaValue += parseFloat(child.val().total);
     renderPedia(child.val());
   });
   updateDashboard();
 });
 
-function renderPedia(data){
+function renderPedia(d){
   pediaTable.innerHTML+=`
     <tr>
-      <td>${data.name}</td>
-      <td>${data.mg}</td>
-      <td>${data.type}</td>
-      <td>${data.price}</td>
+      <td>${d.name}</td>
+      <td>${d.mg}</td>
+      <td>${d.type}</td>
+      <td>₱${d.price}</td>
+      <td>${d.quantity}</td>
+      <td>₱${d.total}</td>
     </tr>`;
 }
 
@@ -294,27 +328,58 @@ onValue(ref(db,"dispense_logs"), snapshot=>{
 });
 
 /* ===== SEARCH & EXPORT ===== */
-window.searchAdult=()=>{ const s=adultSearch.value.toLowerCase(); adultTable.innerHTML=""; Object.keys(adultData).forEach(k=>{ if(adultData[k].name.toLowerCase().includes(s)) renderAdult(k,adultData[k]); }) }
-window.searchPedia=()=>{ const s=pediaSearch.value.toLowerCase(); pediaTable.innerHTML=""; Object.values(pediaData).forEach(d=>{ if(d.name.toLowerCase().includes(s)) renderPedia(d); }) }
+window.searchAdult=()=>{
+  const s = adultSearch.value.toLowerCase();
+  adultTable.innerHTML="";
+  Object.keys(adultData).forEach(k=>{
+    if(adultData[k].name.toLowerCase().includes(s)) renderAdult(k,adultData[k]);
+  });
+}
+window.searchPedia=()=>{
+  const s = pediaSearch.value.toLowerCase();
+  pediaTable.innerHTML="";
+  Object.values(pediaData).forEach(d=>{
+    if(d.name.toLowerCase().includes(s)) renderPedia(d);
+  });
+}
 
-window.exportAdult=()=>{ let csv="Name,Milligram,Price,Qty\n"; Object.values(adultData).forEach(d=>{ csv+=`${d.name},${d.mg},${d.price},${d.qty}\n`;}); download(csv,"adult_inventory.csv"); }
-window.exportPedia=()=>{ let csv="Name,Milligram,Type,Price\n"; Object.values(pediaData).forEach(d=>{ csv+=`${d.name},${d.mg},${d.type},${d.price}\n`;}); download(csv,"pedia_inventory.csv"); }
-
-function download(content,filename){ const blob=new Blob([content],{type:"text/csv"}); const url=URL.createObjectURL(blob); const a=document.createElement("a"); a.href=url; a.download=filename; a.click(); }
+window.exportAdult=()=>{
+  let csv="Name,Milligram,Price,Qty\n";
+  Object.values(adultData).forEach(d=>{
+    csv+=`${d.name},${d.mg},${d.price},${d.qty}\n`;
+  });
+  const blob=new Blob([csv],{type:"text/csv"});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement("a"); a.href=url; a.download="adult_inventory.csv"; a.click();
+}
+window.exportPedia=()=>{
+  let csv="Name,Milligram,Type,Price,Quantity,Total\n";
+  Object.values(pediaData).forEach(d=>{
+    csv+=`${d.name},${d.mg},${d.type},${d.price},${d.quantity},${d.total}\n`;
+  });
+  const blob=new Blob([csv],{type:"text/csv"});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement("a"); a.href=url; a.download="pedia_inventory.csv"; a.click();
+}
 
 /* ===== DASHBOARD ===== */
 function updateDashboard(){
-  totalAdult.innerText = totalAdultCount;
-  totalAdultValue.innerText = "₱"+totalAdultValue.toFixed(2);
-  totalPedia.innerText = totalPediaCount;
+  totalAdult.innerText=adultData?Object.keys(adultData).length:0;
+  totalAdultValue.innerText="₱"+totalAdultValue.toFixed(2);
+  totalPedia.innerText=Object.keys(pediaData).length;
+  totalPediaValue.innerText="₱"+(totalPediaValue||0).toFixed(2);
 }
 
 /* ===== AUTO DAILY BACKUP ===== */
 function autoBackup(){
   const today=new Date().toDateString();
-  if(localStorage.getItem("backupDate")!==today){ exportAdult(); exportPedia(); localStorage.setItem("backupDate",today); }
+  if(localStorage.getItem("backupDate")!==today){
+    exportAdult(); exportPedia();
+    localStorage.setItem("backupDate",today);
+  }
 }
 setTimeout(autoBackup,3000);
 </script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>
