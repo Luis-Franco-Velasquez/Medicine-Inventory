@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <title>Medicine Inventory System - Firestore</title>
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+<script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
 <style>
 .badge-lowstock { 
   background:red; color:white; padding:3px 6px; border-radius:4px; 
@@ -20,38 +21,10 @@
 
   <!-- DASHBOARD -->
   <div class="row mb-4">
-    <div class="col-md-3">
-      <div class="card text-center shadow">
-        <div class="card-body">
-          <h5>Total Adult Medicines</h5>
-          <h2 id="totalAdult">0</h2>
-        </div>
-      </div>
-    </div>
-    <div class="col-md-3">
-      <div class="card text-center shadow">
-        <div class="card-body">
-          <h5>Total Adult Stock Value</h5>
-          <h2 id="totalAdultValue">₱0.00</h2>
-        </div>
-      </div>
-    </div>
-    <div class="col-md-3">
-      <div class="card text-center shadow">
-        <div class="card-body">
-          <h5>Total Pediatric Medicines</h5>
-          <h2 id="totalPedia">0</h2>
-        </div>
-      </div>
-    </div>
-    <div class="col-md-3">
-      <div class="card text-center shadow">
-        <div class="card-body">
-          <h5>Total Pediatric Stock Value</h5>
-          <h2 id="totalPediaValue">₱0.00</h2>
-        </div>
-      </div>
-    </div>
+    <div class="col-md-3"><div class="card text-center shadow"><div class="card-body"><h5>Total Adult Medicines</h5><h2 id="totalAdult">0</h2></div></div></div>
+    <div class="col-md-3"><div class="card text-center shadow"><div class="card-body"><h5>Total Adult Stock Value</h5><h2 id="totalAdultValue">₱0.00</h2></div></div></div>
+    <div class="col-md-3"><div class="card text-center shadow"><div class="card-body"><h5>Total Pediatric Medicines</h5><h2 id="totalPedia">0</h2></div></div></div>
+    <div class="col-md-3"><div class="card text-center shadow"><div class="card-body"><h5>Total Pediatric Stock Value</h5><h2 id="totalPediaValue">₱0.00</h2></div></div></div>
   </div>
 
   <!-- ADULT MEDICINE FORM -->
@@ -59,38 +32,22 @@
     <div class="card-header bg-primary text-white">Adult Medicine Form</div>
     <div class="card-body">
       <form id="adultForm" class="row g-3">
-        <div class="col-md-3">
-          <input type="text" class="form-control" id="adultName" placeholder="Medicine Name" required>
-        </div>
-        <div class="col-md-2">
-          <input type="number" class="form-control" id="adultMg" placeholder="Milligram" required>
-        </div>
-        <div class="col-md-2">
-          <select class="form-select" id="adultType">
-            <option>Tablet</option>
-            <option>Capsule</option>
-          </select>
-        </div>
-        <div class="col-md-2">
-          <input type="number" class="form-control" id="adultPrice" placeholder="Price" required>
-        </div>
-        <div class="col-md-2">
-          <input type="number" class="form-control" id="adultQty" placeholder="Quantity" required>
-        </div>
-        <div class="col-md-1">
-          <button type="submit" class="btn btn-success w-100">Add</button>
-        </div>
+        <div class="col-md-3"><input type="text" class="form-control" id="adultName" placeholder="Medicine Name" required></div>
+        <div class="col-md-2"><input type="number" step="0.01" class="form-control" id="adultMg" placeholder="Milligram" required></div>
+        <div class="col-md-2"><select class="form-select" id="adultType"><option>Tablet</option><option>Capsule</option></select></div>
+        <div class="col-md-2"><input type="number" step="0.01" class="form-control" id="adultPrice" placeholder="Price" required></div>
+        <div class="col-md-2"><input type="number" class="form-control" id="adultQty" placeholder="Quantity" required></div>
+        <div class="col-md-1"><button type="submit" class="btn btn-success w-100">Add</button></div>
       </form>
+
+      <!-- Adult Search & Export -->
+      <div class="d-flex justify-content-between my-2">
+        <input type="text" class="form-control w-50" id="adultSearch" placeholder="Search Adult Medicines...">
+        <button class="btn btn-outline-success" id="exportAdult">Export Adult Excel</button>
+      </div>
+
       <table class="table table-bordered table-hover mt-3">
-        <thead class="table-light">
-          <tr>
-            <th>Name</th>
-            <th>Milligram</th>
-            <th>Price</th>
-            <th>Stock</th>
-            <th>Actions</th>
-          </tr>
-        </thead>
+        <thead class="table-light"><tr><th>Name</th><th>Milligram</th><th>Price</th><th>Stock</th><th>Actions</th></tr></thead>
         <tbody id="adultTable"></tbody>
       </table>
     </div>
@@ -101,49 +58,24 @@
     <div class="card-header bg-success text-white">Pediatric Medicine Fill-Up</div>
     <div class="card-body">
       <form id="pediaForm" class="row g-3">
-        <div class="col-md-3">
-          <input type="text" class="form-control" id="pediaName" placeholder="Medicine Name" required>
-        </div>
-        <div class="col-md-2">
-          <input type="number" class="form-control" id="pediaMg" placeholder="Milligram/ml" required>
-        </div>
-        <div class="col-md-2">
-          <select class="form-select" id="pediaUnit">
-            <option>mg</option>
-            <option>ml</option>
-          </select>
-        </div>
-        <div class="col-md-2">
-          <select class="form-select" id="pediaType">
-            <option>Pieces</option>
-            <option>Bottle</option>
-          </select>
-        </div>
-        <div class="col-md-2">
-          <input type="number" class="form-control" id="pediaPrice" placeholder="Price" min="0" required>
-        </div>
-        <div class="col-md-1">
-          <input type="number" class="form-control" id="pediaQty" placeholder="Qty" min="1" value="1">
-        </div>
-        <div class="col-md-2">
-          <input type="text" class="form-control fw-bold text-success" id="pediaTotal" placeholder="Total" readonly>
-        </div>
-        <div class="col-md-2">
-          <button type="submit" class="btn btn-success w-100">Add</button>
-        </div>
+        <div class="col-md-3"><input type="text" class="form-control" id="pediaName" placeholder="Medicine Name" required></div>
+        <div class="col-md-2"><input type="number" step="0.01" class="form-control" id="pediaMg" placeholder="Milligram/ml" required></div>
+        <div class="col-md-2"><select class="form-select" id="pediaUnit"><option>mg</option><option>ml</option></select></div>
+        <div class="col-md-2"><select class="form-select" id="pediaType"><option>Pieces</option><option>Bottle</option></select></div>
+        <div class="col-md-2"><input type="number" step="0.01" class="form-control" id="pediaPrice" placeholder="Price" min="0" required></div>
+        <div class="col-md-1"><input type="number" class="form-control" id="pediaQty" placeholder="Qty" min="1" value="1"></div>
+        <div class="col-md-2"><input type="text" class="form-control fw-bold text-success" id="pediaTotal" placeholder="Total" readonly></div>
+        <div class="col-md-2"><button type="submit" class="btn btn-success w-100">Add</button></div>
       </form>
+
+      <!-- Pediatric Search & Export -->
+      <div class="d-flex justify-content-between my-2">
+        <input type="text" class="form-control w-50" id="pediaSearch" placeholder="Search Pediatric Medicines...">
+        <button class="btn btn-outline-success" id="exportPedia">Export Pediatric Excel</button>
+      </div>
+
       <table class="table table-bordered table-hover mt-3">
-        <thead class="table-light">
-          <tr>
-            <th>Name</th>
-            <th>Milligram/ml</th>
-            <th>Type</th>
-            <th>Price</th>
-            <th>Quantity</th>
-            <th>Total</th>
-            <th>Actions</th>
-          </tr>
-        </thead>
+        <thead class="table-light"><tr><th>Name</th><th>Milligram/ml</th><th>Type</th><th>Price</th><th>Quantity</th><th>Total</th><th>Actions</th></tr></thead>
         <tbody id="pediaTable"></tbody>
       </table>
     </div>
@@ -154,25 +86,16 @@
     <div class="card-header bg-dark text-white">Dispensing History</div>
     <div class="card-body table-responsive">
       <table class="table table-bordered table-hover">
-        <thead class="table-light">
-          <tr>
-            <th>Date</th>
-            <th>Medicine</th>
-            <th>Milligram/ml</th>
-            <th>Quantity Dispensed</th>
-            <th>Remaining Stock</th>
-          </tr>
-        </thead>
+        <thead class="table-light"><tr><th>Date</th><th>Medicine</th><th>Milligram/ml</th><th>Quantity Dispensed</th><th>Remaining Stock</th></tr></thead>
         <tbody id="historyTable"></tbody>
       </table>
     </div>
   </div>
-
 </div>
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.10.0/firebase-app.js";
-import { getFirestore, collection, addDoc, onSnapshot, doc, updateDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/12.10.0/firebase-firestore.js";
+import { getFirestore, collection, addDoc, onSnapshot, doc, updateDoc, deleteDoc, getDocs } from "https://www.gstatic.com/firebasejs/12.10.0/firebase-firestore.js";
 
 document.addEventListener("DOMContentLoaded", ()=>{
   const firebaseConfig = {
@@ -184,7 +107,6 @@ document.addEventListener("DOMContentLoaded", ()=>{
     appId: "1:1044916941588:web:ef2a8ee26f23b24d07c801",
     measurementId: "G-BB4NQX65NN"
   };
-
   const app = initializeApp(firebaseConfig);
   const db = getFirestore(app);
 
@@ -193,7 +115,7 @@ document.addEventListener("DOMContentLoaded", ()=>{
   function updateDashboard(){
     let totalAdultCount = Object.keys(adultData).length;
     let totalAdultValue = 0;
-    Object.values(adultData).forEach(d=>totalAdultValue += parseFloat(d.price)*parseInt(d.qty));
+    Object.values(adultData).forEach(d=>totalAdultValue += parseFloat(d.price)*parseFloat(d.qty));
 
     let totalPediaCount = Object.keys(pediaData).length;
     let totalPediaValue = 0;
@@ -205,28 +127,27 @@ document.addEventListener("DOMContentLoaded", ()=>{
     document.getElementById("totalPediaValue").innerText = "₱"+totalPediaValue.toFixed(2);
   }
 
-  /* ===== ADULT MEDICINE ===== */
+  // ===== ADULT MEDICINE =====
   const adultForm=document.getElementById("adultForm");
   adultForm.addEventListener("submit", async e=>{
     e.preventDefault();
     const name=document.getElementById("adultName").value.trim();
-    const mg=document.getElementById("adultMg").value.trim();
+    const mg=parseFloat(document.getElementById("adultMg").value).toFixed(2);
     const type=document.getElementById("adultType").value;
     const price=parseFloat(document.getElementById("adultPrice").value);
-    const qty=parseInt(document.getElementById("adultQty").value);
+    const qty=parseFloat(document.getElementById("adultQty").value);
 
     // Check duplicate
-    const exists = Object.values(adultData).some(d=>d.name===name && d.mg===mg+" "+type);
+    const exists = Object.values(adultData).some(d=>d.name===name && d.mg===mg+" mg / "+type);
     if(exists){alert("Already exists!"); return;}
 
-    await addDoc(collection(db,"adult_medicine"),{name, mg:mg+" "+type, price, qty});
+    const mgTypeDisplay = mg+" mg / "+type;
+    await addDoc(collection(db,"adult_medicine"),{name, mg: mgTypeDisplay, price, qty});
     adultForm.reset();
   });
 
-  // Listen to Adult Collection
   onSnapshot(collection(db,"adult_medicine"), snapshot=>{
-    const adultTable=document.getElementById("adultTable");
-    adultTable.innerHTML=""; adultData={};
+    const adultTable=document.getElementById("adultTable"); adultTable.innerHTML=""; adultData={};
     snapshot.forEach(docSnap=>{
       const d=docSnap.data(); adultData[docSnap.id]=d;
       const low=d.qty<10;
@@ -234,8 +155,8 @@ document.addEventListener("DOMContentLoaded", ()=>{
       <tr class="${low?'low-stock':''}">
         <td>${d.name} ${low?'<span class="badge-lowstock">LOW STOCK</span>':''}</td>
         <td>${d.mg}</td>
-        <td><input type="number" class="form-control form-control-sm" value="${d.price}" onchange="updatePrice('adult','${docSnap.id}',this.value)"></td>
-        <td><input type="number" class="form-control form-control-sm" value="${d.qty}" onchange="updateStock('adult','${docSnap.id}',this.value)"></td>
+        <td><input type="number" step="0.01" class="form-control form-control-sm" value="${d.price}" onchange="updatePrice('adult','${docSnap.id}',this.value)"></td>
+        <td><input type="number" step="0.01" class="form-control form-control-sm" value="${d.qty}" onchange="updateStock('adult','${docSnap.id}',this.value)"></td>
         <td>
           <button class="btn btn-sm btn-primary" onclick="deductStock('${docSnap.id}')">Dispense</button>
           <button class="btn btn-sm btn-danger" onclick="deleteItem('adult','${docSnap.id}')">Delete</button>
@@ -245,13 +166,13 @@ document.addEventListener("DOMContentLoaded", ()=>{
     updateDashboard();
   });
 
-  /* ===== PEDIATRIC MEDICINE ===== */
+  // ===== PEDIATRIC MEDICINE =====
   const pediaForm=document.getElementById("pediaForm");
   const pediaTotal=document.getElementById("pediaTotal");
   function updatePediaTotal(){ 
     const price=parseFloat(document.getElementById("pediaPrice").value)||0;
-    const qty=parseInt(document.getElementById("pediaQty").value)||1;
-    pediaTotal.value="₱"+(price*qty);
+    const qty=parseFloat(document.getElementById("pediaQty").value)||1;
+    pediaTotal.value="₱"+(price*qty).toFixed(2);
   }
   document.getElementById("pediaPrice").addEventListener("input",updatePediaTotal);
   document.getElementById("pediaQty").addEventListener("input",updatePediaTotal);
@@ -259,25 +180,21 @@ document.addEventListener("DOMContentLoaded", ()=>{
   pediaForm.addEventListener("submit", async e=>{
     e.preventDefault();
     const name=document.getElementById("pediaName").value.trim();
-    const mg=document.getElementById("pediaMg").value.trim();
+    const mg=parseFloat(document.getElementById("pediaMg").value).toFixed(2);
     const unit=document.getElementById("pediaUnit").value;
     const type=document.getElementById("pediaType").value;
     const price=parseFloat(document.getElementById("pediaPrice").value);
-    const qty=parseInt(document.getElementById("pediaQty").value);
+    const qty=parseFloat(document.getElementById("pediaQty").value);
 
-    // check duplicate
     const duplicate = Object.values(pediaData).some(d=>d.name===name && d.mg===mg+" "+unit && d.type===type);
     if(duplicate){alert("Already exists!"); return;}
 
     await addDoc(collection(db,"pedia_medicine"),{name, mg:mg+" "+unit, type, price, quantity:qty, total:price*qty});
-    pediaForm.reset();
-    pediaTotal.value="";
+    pediaForm.reset(); pediaTotal.value="";
   });
 
-  // Listen to Pediatric Collection
   onSnapshot(collection(db,"pedia_medicine"), snapshot=>{
-    const pediaTable=document.getElementById("pediaTable");
-    pediaTable.innerHTML=""; pediaData={};
+    const pediaTable=document.getElementById("pediaTable"); pediaTable.innerHTML=""; pediaData={};
     snapshot.forEach(docSnap=>{
       const d=docSnap.data(); pediaData[docSnap.id]=d;
       pediaTable.innerHTML+=`
@@ -285,16 +202,16 @@ document.addEventListener("DOMContentLoaded", ()=>{
         <td>${d.name}</td>
         <td>${d.mg}</td>
         <td>${d.type}</td>
-        <td><input type="number" class="form-control form-control-sm" value="${d.price}" onchange="updatePrice('pedia','${docSnap.id}',this.value)"></td>
-        <td><input type="number" class="form-control form-control-sm" value="${d.quantity}" onchange="updateStock('pedia','${docSnap.id}',this.value)"></td>
-        <td>₱${d.total}</td>
+        <td><input type="number" step="0.01" class="form-control form-control-sm" value="${d.price}" onchange="updatePrice('pedia','${docSnap.id}',this.value)"></td>
+        <td><input type="number" step="0.01" class="form-control form-control-sm" value="${d.quantity}" onchange="updateStock('pedia','${docSnap.id}',this.value)"></td>
+        <td>₱${d.total.toFixed(2)}</td>
         <td><button class="btn btn-sm btn-danger" onclick="deleteItem('pedia','${docSnap.id}')">Delete</button></td>
       </tr>`;
     });
     updateDashboard();
   });
 
-  /* ===== FUNCTIONS ===== */
+  // ===== FUNCTIONS =====
   window.updatePrice=async (type,id,value)=>{
     value=parseFloat(value); if(isNaN(value)||value<0)return;
     const docRef=doc(db,type==="adult"?"adult_medicine":"pedia_medicine",id);
@@ -304,7 +221,7 @@ document.addEventListener("DOMContentLoaded", ()=>{
   };
 
   window.updateStock=async (type,id,value)=>{
-    value=parseInt(value); if(isNaN(value)||value<0)return;
+    value=parseFloat(value); if(isNaN(value)||value<0)return;
     const docRef=doc(db,type==="adult"?"adult_medicine":"pedia_medicine",id);
     if(type==="adult") await updateDoc(docRef,{qty:value});
     else await updateDoc(docRef,{quantity:value,total:value*parseFloat(pediaData[id].price)});
@@ -318,7 +235,7 @@ document.addEventListener("DOMContentLoaded", ()=>{
   };
 
   window.deductStock=async (id)=>{
-    const qty=parseInt(prompt("Enter quantity to dispense:")); 
+    const qty=parseFloat(prompt("Enter quantity to dispense:")); 
     if(isNaN(qty)||qty<=0||qty>adultData[id].qty){alert("Invalid");return;}
     const newQty=adultData[id].qty-qty;
     await updateDoc(doc(db,"adult_medicine",id),{qty:newQty});
@@ -332,7 +249,6 @@ document.addEventListener("DOMContentLoaded", ()=>{
     updateDashboard();
   };
 
-  // Listen to dispensing logs
   const historyTable=document.getElementById("historyTable");
   onSnapshot(collection(db,"dispense_logs"), snapshot=>{
     historyTable.innerHTML="";
@@ -348,9 +264,48 @@ document.addEventListener("DOMContentLoaded", ()=>{
         </tr>`;
     });
   });
+
+  // ===== SEARCH =====
+  document.getElementById("adultSearch").addEventListener("input", e=>{
+    const query=e.target.value.toLowerCase();
+    document.getElementById("adultTable").querySelectorAll("tr").forEach(row=>{
+      row.style.display = row.innerText.toLowerCase().includes(query) ? "" : "none";
+    });
+  });
+  document.getElementById("pediaSearch").addEventListener("input", e=>{
+    const query=e.target.value.toLowerCase();
+    document.getElementById("pediaTable").querySelectorAll("tr").forEach(row=>{
+      row.style.display = row.innerText.toLowerCase().includes(query) ? "" : "none";
+    });
+  });
+
+  // ===== EXPORT EXCEL =====
+  function exportTableToExcel(tableId, filename) {
+    const table=document.getElementById(tableId);
+    const wb=XLSX.utils.book_new();
+    const ws=XLSX.utils.table_to_sheet(table);
+    XLSX.utils.book_append_sheet(wb, ws, "Sheet1");
+    XLSX.writeFile(wb, filename);
+  }
+  document.getElementById("exportAdult").addEventListener("click", ()=>exportTableToExcel("adultTable","Adult_Medicines.xlsx"));
+  document.getElementById("exportPedia").addEventListener("click", ()=>exportTableToExcel("pediaTable","Pediatric_Medicines.xlsx"));
+
+  // ===== AUTO DAILY BACKUP =====
+  async function backupFirestore() {
+    const adultSnap = await getDocs(collection(db,"adult_medicine"));
+    const pediaSnap = await getDocs(collection(db,"pedia_medicine"));
+    const dispenseSnap = await getDocs(collection(db,"dispense_logs"));
+    const backupData = {
+      adult_medicine: adultSnap.docs.map(d=>d.data()),
+      pedia_medicine: pediaSnap.docs.map(d=>d.data()),
+      dispense_logs: dispenseSnap.docs.map(d=>d.data()),
+      backup_date: new Date().toLocaleString()
+    };
+    const blob = new Blob([JSON.stringify(backupData,null,2)], {type:"application/json"});
+    const a=document.createElement("a"); a.href=URL.createObjectURL(blob); a.download="Firestore_Backup_"+Date.now()+".json"; a.click();
+  }
+  setInterval(backupFirestore, 24*60*60*1000); // every 24h
 });
 </script>
-
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>
