@@ -93,222 +93,227 @@
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.10.0/firebase-app.js";
-import { getFirestore, collection, addDoc, onSnapshot, doc, updateDoc, deleteDoc, getDocs } from "https://www.gstatic.com/firebasejs/12.10.0/firebase-firestore.js";
+import { getFirestore, collection, addDoc, onSnapshot, doc, updateDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/12.10.0/firebase-firestore.js";
 
-document.addEventListener("DOMContentLoaded", ()=>{
-  const firebaseConfig = {
-    apiKey: "AIzaSyDkuo0jjGYIBC1MKOWD42XvcB4nWy_72qQ",
-    authDomain: "medicine-inventory-cc500.firebaseapp.com",
-    projectId: "medicine-inventory-cc500",
-    storageBucket: "medicine-inventory-cc500.appspot.com",
-    messagingSenderId: "1044916941588",
-    appId: "1:1044916941588:web:ef2a8ee26f23b24d07c801",
-    measurementId: "G-BB4NQX65NN"
-  };
-  const app = initializeApp(firebaseConfig);
-  const db = getFirestore(app);
+const firebaseConfig = {
+  apiKey: "AIzaSyDkuo0jjGYIBC1MKOWD42XvcB4nWy_72qQ",
+  authDomain: "medicine-inventory-cc500.firebaseapp.com",
+  projectId: "medicine-inventory-cc500",
+  storageBucket: "medicine-inventory-cc500.appspot.com",
+  messagingSenderId: "1044916941588",
+  appId: "1:1044916941588:web:ef2a8ee26f23b24d07c801",
+  measurementId: "G-BB4NQX65NN"
+};
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
 
-  let adultData={}, pediaData={};
+let adultData={}, pediaData={};
 
-  function updateDashboard(){
-    let totalAdultCount = Object.keys(adultData).length;
-    let totalAdultValue = 0;
-    Object.values(adultData).forEach(d=>totalAdultValue += parseFloat(d.price)*parseFloat(d.qty));
+// --- DASHBOARD UPDATE FUNCTION ---
+function updateDashboard(){
+  let totalAdultCount = Object.keys(adultData).length;
+  let totalAdultValue = Object.values(adultData).reduce((sum,d)=>sum + parseFloat(d.price)*parseFloat(d.qty),0);
+  let totalPediaCount = Object.keys(pediaData).length;
+  let totalPediaValue = Object.values(pediaData).reduce((sum,d)=>sum + parseFloat(d.total),0);
 
-    let totalPediaCount = Object.keys(pediaData).length;
-    let totalPediaValue = 0;
-    Object.values(pediaData).forEach(d=>totalPediaValue += parseFloat(d.total));
+  document.getElementById("totalAdult").innerText = totalAdultCount;
+  document.getElementById("totalAdultValue").innerText = "₱"+totalAdultValue.toFixed(2);
+  document.getElementById("totalPedia").innerText = totalPediaCount;
+  document.getElementById("totalPediaValue").innerText = "₱"+totalPediaValue.toFixed(2);
+}
 
-    document.getElementById("totalAdult").innerText = totalAdultCount;
-    document.getElementById("totalAdultValue").innerText = "₱"+totalAdultValue.toFixed(2);
-    document.getElementById("totalPedia").innerText = totalPediaCount;
-    document.getElementById("totalPediaValue").innerText = "₱"+totalPediaValue.toFixed(2);
-  }
+// --- ADULT FORM ---
+document.getElementById("adultForm").addEventListener("submit", async e=>{
+  e.preventDefault();
+  const name=document.getElementById("adultName").value.trim();
+  const mg=document.getElementById("adultMg").value.trim();
+  const type=document.getElementById("adultType").value;
+  const price=parseFloat(document.getElementById("adultPrice").value);
+  const qty=parseFloat(document.getElementById("adultQty").value);
 
-  // Adult Medicine
-  const adultForm=document.getElementById("adultForm");
-  adultForm.addEventListener("submit", async e=>{
-    e.preventDefault();
-    const name=document.getElementById("adultName").value.trim();
-    const mgInput=document.getElementById("adultMg").value.trim();
-    const type=document.getElementById("adultType").value;
-    const price=parseFloat(document.getElementById("adultPrice").value);
-    const qty=parseFloat(document.getElementById("adultQty").value);
+  const exists = Object.values(adultData).some(d=>d.name===name && d.mg===mg+" / "+type);
+  if(exists){alert("Already exists!"); return;}
 
-    const exists = Object.values(adultData).some(d=>d.name===name && d.mg===mgInput+" / "+type);
-    if(exists){alert("Already exists!"); return;}
+  await addDoc(collection(db,"adult_medicine"),{name, mg: mg+" / "+type, price, qty});
+  document.getElementById("adultForm").reset();
+});
 
-    const mgTypeDisplay = mgInput + " / " + type;
-    await addDoc(collection(db,"adult_medicine"),{name, mg: mgTypeDisplay, price, qty});
-    adultForm.reset();
-  });
+// --- PEDIATRIC FORM ---
+function calculatePediaTotal(){ 
+  const price=parseFloat(document.getElementById("pediaPrice").value||0);
+  const qty=parseFloat(document.getElementById("pediaQty").value||0);
+  document.getElementById("pediaTotal").value = (price*qty).toFixed(2);
+}
+document.getElementById("pediaPrice").addEventListener("input", calculatePediaTotal);
+document.getElementById("pediaQty").addEventListener("input", calculatePediaTotal);
 
-  onSnapshot(collection(db,"adult_medicine"), snapshot=>{
-    const adultTable=document.getElementById("adultTable"); adultTable.innerHTML=""; adultData={};
-    snapshot.forEach(docSnap=>{
-      const d=docSnap.data(); adultData[docSnap.id]=d;
-      const low=d.qty<10;
-      adultTable.innerHTML+=`
+document.getElementById("pediaForm").addEventListener("submit", async e=>{
+  e.preventDefault();
+  const name=document.getElementById("pediaName").value.trim();
+  const mg=document.getElementById("pediaMg").value.trim();
+  const unit=document.getElementById("pediaUnit").value;
+  const type=document.getElementById("pediaType").value;
+  const price=parseFloat(document.getElementById("pediaPrice").value);
+  const qty=parseFloat(document.getElementById("pediaQty").value);
+  const total=(price*qty).toFixed(2);
+
+  const exists = Object.values(pediaData).some(d=>d.name===name && d.mg===mg+" "+unit);
+  if(exists){alert("Already exists!"); return;}
+
+  await addDoc(collection(db,"pedia_medicine"),{name, mg: mg+" "+unit, type, price, qty, total});
+  document.getElementById("pediaForm").reset();
+  document.getElementById("pediaTotal").value = "";
+});
+
+// --- REALTIME SNAPSHOTS ---
+onSnapshot(collection(db,"adult_medicine"), snapshot=>{
+  const adultTable=document.getElementById("adultTable"); adultTable.innerHTML=""; adultData={};
+  snapshot.forEach(docSnap=>{
+    const d=docSnap.data(); adultData[docSnap.id]=d;
+    const low=d.qty<10;
+    adultTable.innerHTML+=`
       <tr class="${low?'low-stock':''}">
         <td>${d.name} ${low?'<span class="badge-lowstock">LOW STOCK</span>':''}</td>
         <td>${d.mg}</td>
         <td><input type="number" step="0.01" class="form-control form-control-sm" value="${d.price}" onchange="updatePrice('adult','${docSnap.id}',this.value)"></td>
         <td><input type="number" step="0.01" class="form-control form-control-sm" value="${d.qty}" onchange="updateStock('adult','${docSnap.id}',this.value)"></td>
         <td>
-          <button class="btn btn-sm btn-primary" onclick="deductStock('${docSnap.id}')">Dispense</button>
+          <button class="btn btn-sm btn-primary" onclick="deductStock('adult','${docSnap.id}')">Dispense</button>
           <button class="btn btn-sm btn-danger" onclick="deleteItem('adult','${docSnap.id}')">Delete</button>
         </td>
       </tr>`;
-    });
-    updateDashboard();
   });
-
-  // Pediatric and rest of JS follows same pattern...
-  // Search, export, updatePrice, updateStock, deleteItem, deductStock, history, auto-backup
-  // (You can copy the Pediatric logic from previous version but with mg/ml as textbox)
+  updateDashboard();
 });
 
-
-  // ===== PEDIATRIC MEDICINE =====
-  const pediaForm=document.getElementById("pediaForm");
-  const pediaTotal=document.getElementById("pediaTotal");
-  function updatePediaTotal(){ 
-    const price=parseFloat(document.getElementById("pediaPrice").value)||0;
-    const qty=parseFloat(document.getElementById("pediaQty").value)||1;
-    pediaTotal.value="₱"+(price*qty).toFixed(2);
-  }
-  document.getElementById("pediaPrice").addEventListener("input",updatePediaTotal);
-  document.getElementById("pediaQty").addEventListener("input",updatePediaTotal);
-
-  pediaForm.addEventListener("submit", async e=>{
-    e.preventDefault();
-    const name=document.getElementById("pediaName").value.trim();
-    const mg=parseFloat(document.getElementById("pediaMg").value).toFixed(2);
-    const unit=document.getElementById("pediaUnit").value;
-    const type=document.getElementById("pediaType").value;
-    const price=parseFloat(document.getElementById("pediaPrice").value);
-    const qty=parseFloat(document.getElementById("pediaQty").value);
-
-    const duplicate = Object.values(pediaData).some(d=>d.name===name && d.mg===mg+" "+unit && d.type===type);
-    if(duplicate){alert("Already exists!"); return;}
-
-    await addDoc(collection(db,"pedia_medicine"),{name, mg:mg+" "+unit, type, price, quantity:qty, total:price*qty});
-    pediaForm.reset(); pediaTotal.value="";
-  });
-
-  onSnapshot(collection(db,"pedia_medicine"), snapshot=>{
-    const pediaTable=document.getElementById("pediaTable"); pediaTable.innerHTML=""; pediaData={};
-    snapshot.forEach(docSnap=>{
-      const d=docSnap.data(); pediaData[docSnap.id]=d;
-      pediaTable.innerHTML+=`
-      <tr>
-        <td>${d.name}</td>
+onSnapshot(collection(db,"pedia_medicine"), snapshot=>{
+  const pediaTable=document.getElementById("pediaTable"); pediaTable.innerHTML=""; pediaData={};
+  snapshot.forEach(docSnap=>{
+    const d=docSnap.data(); pediaData[docSnap.id]=d;
+    const low=d.qty<10;
+    pediaTable.innerHTML+=`
+      <tr class="${low?'low-stock':''}">
+        <td>${d.name} ${low?'<span class="badge-lowstock">LOW STOCK</span>':''}</td>
         <td>${d.mg}</td>
         <td>${d.type}</td>
         <td><input type="number" step="0.01" class="form-control form-control-sm" value="${d.price}" onchange="updatePrice('pedia','${docSnap.id}',this.value)"></td>
-        <td><input type="number" step="0.01" class="form-control form-control-sm" value="${d.quantity}" onchange="updateStock('pedia','${docSnap.id}',this.value)"></td>
-        <td>₱${d.total.toFixed(2)}</td>
+        <td><input type="number" step="0.01" class="form-control form-control-sm" value="${d.qty}" onchange="updateStock('pedia','${docSnap.id}',this.value)"></td>
+        <td>${d.total}</td>
         <td><button class="btn btn-sm btn-danger" onclick="deleteItem('pedia','${docSnap.id}')">Delete</button></td>
       </tr>`;
-    });
-    updateDashboard();
   });
-
-  // ===== FUNCTIONS =====
-  window.updatePrice=async (type,id,value)=>{
-    value=parseFloat(value); if(isNaN(value)||value<0)return;
-    const docRef=doc(db,type==="adult"?"adult_medicine":"pedia_medicine",id);
-    if(type==="adult") await updateDoc(docRef,{price:value});
-    else await updateDoc(docRef,{price:value,total:value*parseFloat(pediaData[id].quantity)});
-    updateDashboard();
-  };
-
-  window.updateStock=async (type,id,value)=>{
-    value=parseFloat(value); if(isNaN(value)||value<0)return;
-    const docRef=doc(db,type==="adult"?"adult_medicine":"pedia_medicine",id);
-    if(type==="adult") await updateDoc(docRef,{qty:value});
-    else await updateDoc(docRef,{quantity:value,total:value*parseFloat(pediaData[id].price)});
-    updateDashboard();
-  };
-
-  window.deleteItem=async (type,id)=>{
-    if(!confirm("Delete this item?")) return;
-    await deleteDoc(doc(db,type==="adult"?"adult_medicine":"pedia_medicine",id));
-    updateDashboard();
-  };
-
-  window.deductStock=async (id)=>{
-    const qty=parseFloat(prompt("Enter quantity to dispense:")); 
-    if(isNaN(qty)||qty<=0||qty>adultData[id].qty){alert("Invalid");return;}
-    const newQty=adultData[id].qty-qty;
-    await updateDoc(doc(db,"adult_medicine",id),{qty:newQty});
-    await addDoc(collection(db,"dispense_logs"),{
-      medicine:adultData[id].name,
-      milligram:adultData[id].mg,
-      quantity_dispensed:qty,
-      remaining_stock:newQty,
-      date:new Date().toLocaleString()
-    });
-    updateDashboard();
-  };
-
-  const historyTable=document.getElementById("historyTable");
-  onSnapshot(collection(db,"dispense_logs"), snapshot=>{
-    historyTable.innerHTML="";
-    snapshot.forEach(docSnap=>{
-      const d=docSnap.data();
-      historyTable.innerHTML+=`
-        <tr>
-          <td>${d.date}</td>
-          <td>${d.medicine}</td>
-          <td>${d.milligram}</td>
-          <td>${d.quantity_dispensed}</td>
-          <td>${d.remaining_stock}</td>
-        </tr>`;
-    });
-  });
-
-  // ===== SEARCH =====
-  document.getElementById("adultSearch").addEventListener("input", e=>{
-    const query=e.target.value.toLowerCase();
-    document.getElementById("adultTable").querySelectorAll("tr").forEach(row=>{
-      row.style.display = row.innerText.toLowerCase().includes(query) ? "" : "none";
-    });
-  });
-  document.getElementById("pediaSearch").addEventListener("input", e=>{
-    const query=e.target.value.toLowerCase();
-    document.getElementById("pediaTable").querySelectorAll("tr").forEach(row=>{
-      row.style.display = row.innerText.toLowerCase().includes(query) ? "" : "none";
-    });
-  });
-
-  // ===== EXPORT EXCEL =====
-  function exportTableToExcel(tableId, filename) {
-    const table=document.getElementById(tableId);
-    const wb=XLSX.utils.book_new();
-    const ws=XLSX.utils.table_to_sheet(table);
-    XLSX.utils.book_append_sheet(wb, ws, "Sheet1");
-    XLSX.writeFile(wb, filename);
-  }
-  document.getElementById("exportAdult").addEventListener("click", ()=>exportTableToExcel("adultTable","Adult_Medicines.xlsx"));
-  document.getElementById("exportPedia").addEventListener("click", ()=>exportTableToExcel("pediaTable","Pediatric_Medicines.xlsx"));
-
-  // ===== AUTO DAILY BACKUP =====
-  async function backupFirestore() {
-    const adultSnap = await getDocs(collection(db,"adult_medicine"));
-    const pediaSnap = await getDocs(collection(db,"pedia_medicine"));
-    const dispenseSnap = await getDocs(collection(db,"dispense_logs"));
-    const backupData = {
-      adult_medicine: adultSnap.docs.map(d=>d.data()),
-      pedia_medicine: pediaSnap.docs.map(d=>d.data()),
-      dispense_logs: dispenseSnap.docs.map(d=>d.data()),
-      backup_date: new Date().toLocaleString()
-    };
-    const blob = new Blob([JSON.stringify(backupData,null,2)], {type:"application/json"});
-    const a=document.createElement("a"); a.href=URL.createObjectURL(blob); a.download="Firestore_Backup_"+Date.now()+".json"; a.click();
-  }
-  setInterval(backupFirestore, 24*60*60*1000); // every 24h
+  updateDashboard();
 });
+
+// --- FUNCTIONS: Update, Delete, Deduct Stock ---
+window.updatePrice = async (type,id,value)=>{
+  const ref=doc(db, type==="adult"?"adult_medicine":"pedia_medicine", id);
+  const newVal=parseFloat(value)||0;
+  if(type==="pedia"){
+    const d=pediaData[id]; const total=(d.qty*newVal).toFixed(2);
+    await updateDoc(ref,{price:newVal,total});
+  }else await updateDoc(ref,{price:newVal});
+};
+
+window.updateStock = async (type,id,value)=>{
+  const ref=doc(db, type==="adult"?"adult_medicine":"pedia_medicine", id);
+  const newVal=parseFloat(value)||0;
+  if(type==="pedia"){
+    const d=pediaData[id]; const total=(d.price*newVal).toFixed(2);
+    await updateDoc(ref,{qty:newVal,total});
+  } else await updateDoc(ref,{qty:newVal});
+};
+
+window.deleteItem = async (type,id)=>{
+  if(confirm("Delete this item?")){
+    await deleteDoc(doc(db,type==="adult"?"adult_medicine":"pedia_medicine",id));
+  }
+};
+
+
+
+
+
+
+// --- DISPENSE STOCK ---
+window.deductStock = async (id)=>{
+  const ref = doc(db, "adult_medicine", id);
+  const d = adultData[id];
+  const qty = parseFloat(prompt(`Dispense how many of "${d.name}"?`, 1));
+  if(!qty || qty <=0) return;
+  const remaining = d.qty - qty;
+  if(remaining < 0) { alert("Not enough stock!"); return; }
+
+  await updateDoc(ref, { qty: remaining });
+
+  // Add to history
+  const date = new Date().toLocaleString();
+  const historyRef = collection(db, "dispensing_history");
+  await addDoc(historyRef, { date, medicine: d.name, mg: d.mg, qtyDispensed: qty, remainingStock: remaining });
+};
+
+// --- HISTORY SNAPSHOT ---
+onSnapshot(collection(db, "dispensing_history"), snapshot=>{
+  const historyTable = document.getElementById("historyTable"); historyTable.innerHTML="";
+  snapshot.forEach(docSnap=>{
+    const h = docSnap.data();
+    historyTable.innerHTML+=`
+      <tr>
+        <td>${h.date}</td>
+        <td>${h.medicine}</td>
+        <td>${h.mg}</td>
+        <td>${h.qtyDispensed}</td>
+        <td>${h.remainingStock}</td>
+      </tr>`;
+  });
+});
+
+// --- SEARCH FUNCTION ---
+document.getElementById("adultSearch").addEventListener("input", e=>{
+  const term = e.target.value.toLowerCase();
+  Array.from(document.getElementById("adultTable").rows).forEach(r=>{
+    r.style.display = r.cells[0].innerText.toLowerCase().includes(term) || 
+                      r.cells[1].innerText.toLowerCase().includes(term) ? "" : "none";
+  });
+});
+
+document.getElementById("pediaSearch").addEventListener("input", e=>{
+  const term = e.target.value.toLowerCase();
+  Array.from(document.getElementById("pediaTable").rows).forEach(r=>{
+    r.style.display = r.cells[0].innerText.toLowerCase().includes(term) || 
+                      r.cells[1].innerText.toLowerCase().includes(term) ? "" : "none";
+  });
+});
+
+// --- EXPORT TO EXCEL ---
+function exportTableToExcel(tableId, filename){
+  const wb = XLSX.utils.book_new();
+  const ws = XLSX.utils.table_to_sheet(document.getElementById(tableId));
+  XLSX.utils.book_append_sheet(wb, ws, "Sheet1");
+  XLSX.writeFile(wb, filename);
+}
+
+document.getElementById("exportAdult").addEventListener("click", ()=>exportTableToExcel("adultTable","Adult_Medicines.xlsx"));
+document.getElementById("exportPedia").addEventListener("click", ()=>exportTableToExcel("pediaTable","Pediatric_Medicines.xlsx"));
+
+// --- AUTO DAILY BACKUP ---
+async function dailyBackup(){
+  const today = new Date().toISOString().split("T")[0];
+  // Create snapshot of adult_medicine
+  const adultSnap = await getDocs(collection(db, "adult_medicine"));
+  const adultDataBackup = adultSnap.docs.map(d=>d.data());
+  const blobAdult = new Blob([JSON.stringify(adultDataBackup,null,2)], {type:"application/json"});
+  const aAdult = document.createElement("a"); aAdult.href=URL.createObjectURL(blobAdult); aAdult.download=`Adult_Medicines_Backup_${today}.json`; aAdult.click();
+
+  // Pediatric
+  const pediaSnap = await getDocs(collection(db, "pedia_medicine"));
+  const pediaDataBackup = pediaSnap.docs.map(d=>d.data());
+  const blobPedia = new Blob([JSON.stringify(pediaDataBackup,null,2)], {type:"application/json"});
+  const aPedia = document.createElement("a"); aPedia.href=URL.createObjectURL(blobPedia); aPedia.download=`Pediatric_Medicines_Backup_${today}.json`; aPedia.click();
+}
+
+// Trigger backup once a day (simple example, triggers on page load)
+dailyBackup();
 </script>
 </body>
 </html>
