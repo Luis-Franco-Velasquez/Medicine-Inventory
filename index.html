@@ -6,7 +6,9 @@
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-import { getFirestore, collection, addDoc, getDocs, doc, updateDoc, getDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import {
+  getFirestore, collection, addDoc, getDocs, doc, updateDoc, getDoc
+} from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 import * as XLSX from "https://cdn.jsdelivr.net/npm/xlsx@0.18.5/+esm";
 
 /* Firebase Config */
@@ -25,7 +27,6 @@ const db = getFirestore(app);
 
 let currentCollection = "";
 let selectedMedicinesList = [];
-let currentFilter = "";
 
 // Medicine Type select
 document.getElementById("medicineType")?.addEventListener("change", (e)=>{
@@ -80,7 +81,7 @@ function selectMedicine(id, data) {
   document.getElementById("medicineResults").innerHTML = "";
 }
 
-// Render selected medicines and grand total
+// Render selected medicines with labels
 function renderSelectedMedicines() {
   const container = document.getElementById("selectedMedicines");
   container.innerHTML = "";
@@ -90,13 +91,24 @@ function renderSelectedMedicines() {
     grandTotal += parseFloat(med.total);
 
     const div = document.createElement("div");
-    div.className = "d-flex align-items-center mb-1 gap-2 flex-wrap";
+    div.className = "d-flex flex-wrap align-items-center mb-1 gap-2 border p-2 rounded";
     div.innerHTML = `
-      <span style="flex:2">${med.name} - ${med.mg}</span>
-      <input type="number" value="${med.quantity}" min="1" style="width:60px;" onchange="updateMedicineQty(${index}, this.value)">
-      <input type="number" value="${med.price}" min="0" step="0.01" style="width:80px;" onchange="updateMedicinePrice(${index}, this.value)">
-      <input type="number" value="${med.total}" style="width:80px;" readonly>
-      <button type="button" class="btn btn-sm btn-danger" onclick="removeMedicine(${index})">Remove</button>
+      <div style="flex:2"><strong>${med.name} - ${med.mg}</strong></div>
+      <div style="flex:1">
+        <label>Qty:</label>
+        <input type="number" value="${med.quantity}" min="1" style="width:60px;" onchange="updateMedicineQty(${index}, this.value)">
+      </div>
+      <div style="flex:1">
+        <label>Price:</label>
+        <input type="number" value="${med.price}" min="0" step="0.01" style="width:80px;" onchange="updateMedicinePrice(${index}, this.value)">
+      </div>
+      <div style="flex:1">
+        <label>Total:</label>
+        <input type="number" value="${med.total}" style="width:80px;" readonly>
+      </div>
+      <div style="flex:1">
+        <button type="button" class="btn btn-sm btn-danger" onclick="removeMedicine(${index})">Remove</button>
+      </div>
     `;
     container.appendChild(div);
   });
@@ -172,7 +184,7 @@ window.addRecord = async function() {
     await updateDoc(medRef, { qty: medData.qty - med.quantity });
   }
 
-  // Save record
+  // Save record with all medicines
   await addDoc(collection(db,"medical_records"),{
     patientName,
     date,
@@ -180,7 +192,7 @@ window.addRecord = async function() {
     problem,
     blockLeader,
     medicineType: medType,
-    medicines: selectedMedicinesList.map(m => ({
+    medicines: selectedMedicinesList.map(m=>({
       name: m.name,
       mg: m.mg,
       quantity: m.quantity,
@@ -205,17 +217,15 @@ window.addRecord = async function() {
   document.getElementById("medicineType").value="";
 };
 
-// Load patient history
-async function loadHistory(){
+// Load patient history with filter
+window.loadHistory = async function(filterBarangay="") {
   const snapshot = await getDocs(collection(db,"medical_records"));
   const table = document.getElementById("history");
   table.innerHTML = "";
-
   snapshot.forEach(docSnap=>{
     const d = docSnap.data();
-    if(currentFilter && d.barangay !== currentFilter) return;
-
-    const meds = d.medicines.map(m => `${m.name} (Qty:${m.quantity}, Price:${m.price_at_time}, Total:${m.total})`).join("; ");
+    if(filterBarangay && d.barangay !== filterBarangay) return;
+    const meds = d.medicines.map(m=>`${m.name} (Qty:${m.quantity},₱${m.price_at_time})`).join(", ");
     table.innerHTML += `
       <tr>
         <td>${d.date}</td>
@@ -225,50 +235,44 @@ async function loadHistory(){
         <td>${d.blockLeader}</td>
         <td>${d.medicineType}</td>
         <td>${meds}</td>
-        <td>₱ ${d.total.toFixed(2)}</td>
+        <td>${d.total}</td>
       </tr>`;
   });
-}
-window.loadHistory = loadHistory;
-loadHistory();
-
-// Filter by barangay
-window.applyBarangayFilter = function() {
-  currentFilter = document.getElementById("filterBarangay").value;
-  loadHistory();
 };
 
-// Export Excel (one medicine per row)
-window.exportExcel = async function(){
+// Filter by Barangay
+window.filterBarangay = function() {
+  const val = document.getElementById("filterBarangay").value;
+  loadHistory(val);
+};
+
+// Export Excel
+window.exportExcel = async function() {
+  const filterVal = document.getElementById("filterBarangay").value;
   const snapshot = await getDocs(collection(db,"medical_records"));
-  const data = [];
-
-  snapshot.forEach(docSnap => {
+  const data=[];
+  snapshot.forEach(docSnap=>{
     const d = docSnap.data();
-    if(currentFilter && d.barangay !== currentFilter) return;
-
-    d.medicines.forEach(m => {
-      data.push({
-        Date: d.date,
-        Name: d.patientName,
-        Barangay: d.barangay,
-        Problem: d.problem,
-        BlockLeader: d.blockLeader,
-        Type: d.medicineType,
-        Medicine: m.name,
-        MG: m.mg,
-        Quantity: m.quantity,
-        Price: m.price_at_time,
-        Total: m.total,
-      });
-    });
+    if(filterVal && d.barangay !== filterVal) return;
+    const record = {
+      Date: d.date,
+      Name: d.patientName,
+      Barangay: d.barangay,
+      Problem: d.problem,
+      BlockLeader: d.blockLeader,
+      Type: d.medicineType,
+      Medicines: d.medicines.map(m=>`${m.name} (Qty:${m.quantity},₱${m.price_at_time})`).join(", "),
+      Total: d.total
+    };
+    data.push(record);
   });
-
-  const ws = XLSX.utils.json_to_sheet(data);
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, "Records");
-  XLSX.writeFile(wb, "Medical_Report.xlsx");
+  const ws=XLSX.utils.json_to_sheet(data);
+  const wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,ws,"Records");
+  XLSX.writeFile(wb,"Medical_Report.xlsx");
 };
+
+loadHistory();
 </script>
 </head>
 
@@ -280,10 +284,10 @@ window.exportExcel = async function(){
 
 <!-- Patient Form -->
 <div class="card p-3 mb-4">
-  <div class="row g-3">
-    <div class="col-md-3"><input type="date" class="form-control" id="date" placeholder="Date"></div>
-    <div class="col-md-3"><input type="text" class="form-control" id="patientName" placeholder="Patient Name"></div>
-    <div class="col-md-3">
+  <div class="row g-3 mb-2">
+    <div class="col-md-2"><label>Date:</label><input type="date" class="form-control" id="date"></div>
+    <div class="col-md-3"><label>Name:</label><input type="text" class="form-control" id="patientName" placeholder="Patient Name"></div>
+    <div class="col-md-3"><label>Barangay:</label>
       <select class="form-select" id="barangaySelect" onchange="toggleBarangayTextbox()">
         <option value="">Select Barangay</option>
         <option value="Aduas Centro">Aduas Centro</option>
@@ -313,61 +317,66 @@ window.exportExcel = async function(){
       </select>
       <input type="text" class="form-control mt-1" id="barangayTextbox" placeholder="Enter Barangay" style="display:none;">
     </div>
-    <div class="col-md-3"><input type="text" class="form-control" id="blockLeader" placeholder="Block Leader"></div>
-    <div class="col-md-6"><input type="text" class="form-control" id="problem" placeholder="Problem Presented"></div>
-    <div class="col-md-3">
+    <div class="col-md-2"><label>Block Leader:</label><input type="text" class="form-control" id="blockLeader" placeholder="Block Leader"></div>
+  </div>
+  <div class="row g-3 mb-2">
+    <div class="col-md-6"><label>Problem Presented:</label><input type="text" class="form-control" id="problem" placeholder="Problem Presented"></div>
+    <div class="col-md-3"><label>Type:</label>
       <select class="form-select" id="medicineType">
         <option value="">Select Type</option>
         <option>Adult</option>
         <option>Pedia</option>
       </select>
     </div>
-    <div class="col-md-6 position-relative">
+    <div class="col-md-3"><label>Search Medicine:</label>
       <input type="text" class="form-control" id="medicineSearch" placeholder="Search medicine..." oninput="searchMedicine()">
       <div id="medicineResults" class="list-group position-absolute w-100" style="z-index:10;"></div>
       <div id="selectedMedicines" class="mt-2"></div>
-      <div class="mt-1 d-flex justify-content-end"><strong>Total: ₱ <span id="grandTotal">0.00</span></strong></div>
+      <div class="mt-1 d-flex justify-content-end">
+        <strong>Total: ₱ <span id="grandTotal">0.00</span></strong>
+      </div>
     </div>
-    <div class="col-md-3"><button class="btn btn-primary w-100" onclick="addRecord()">Save</button></div>
+  </div>
+  <div class="d-flex justify-content-end">
+    <button class="btn btn-primary me-2" onclick="addRecord()">Save</button>
+    <button class="btn btn-warning" onclick="exportExcel()">Export Excel</button>
   </div>
 </div>
 
-<!-- Filter and Table -->
-<div class="mb-3 row g-2 align-items-center">
-  <div class="col-md-3">
-    <label>Filter by Barangay:</label>
-    <select id="filterBarangay" class="form-select" onchange="applyBarangayFilter()">
-      <option value="">All Barangays</option>
-      <option value="Aduas Centro">Aduas Centro</option>
-      <option value="Aduas Norte">Aduas Norte</option>
-      <option value="Aduas Sur">Aduas Sur</option>
-      <option value="Barrera">Barrera</option>
-      <option value="Cantarilla">Cantarilla</option>
-      <option value="Cruz Roja">Cruz Roja</option>
-      <option value="Daan Sarile">Daan Sarile</option>
-      <option value="Dimasalang">Dimasalang</option>
-      <option value="D.S. Garcia">D.S. Garcia</option>
-      <option value="Gen. Luna">Gen. Luna</option>
-      <option value="Imelda">Imelda</option>
-      <option value="Isla">Isla</option>
-      <option value="M.S. Garcia">M.S. Garcia</option>
-      <option value="Nabao">Nabao</option>
-      <option value="Obrero">Obrero</option>
-      <option value="Pagas">Pagas</option>
-      <option value="Pag-Asa">Pag-Asa</option>
-      <option value="San Juan Acffa">San Juan Acffa</option>
-      <option value="San Roque Norte">San Roque Norte</option>
-      <option value="San Roque Sur">San Roque Sur</option>
-      <option value="Sanbermicristi">Sanbermicristi</option>
-      <option value="Sumacab Este">Sumacab Este</option>
-      <option value="Valdefuente">Valdefuente</option>
-      <option value="Other">Other</option>
-    </select>
-  </div>
+<!-- Filter -->
+<div class="mb-2">
+  <label>Filter by Barangay:</label>
+  <select class="form-select w-25" id="filterBarangay" onchange="filterBarangay()">
+    <option value="">All Barangays</option>
+    <option value="Aduas Centro">Aduas Centro</option>
+    <option value="Aduas Norte">Aduas Norte</option>
+    <option value="Aduas Sur">Aduas Sur</option>
+    <option value="Barrera">Barrera</option>
+    <option value="Cantarilla">Cantarilla</option>
+    <option value="Cruz Roja">Cruz Roja</option>
+    <option value="Daan Sarile">Daan Sarile</option>
+    <option value="Dimasalang">Dimasalang</option>
+    <option value="D.S. Garcia">D.S. Garcia</option>
+    <option value="Gen. Luna">Gen. Luna</option>
+    <option value="Imelda">Imelda</option>
+    <option value="Isla">Isla</option>
+    <option value="M.S. Garcia">M.S. Garcia</option>
+    <option value="Nabao">Nabao</option>
+    <option value="Obrero">Obrero</option>
+    <option value="Pagas">Pagas</option>
+    <option value="Pag-Asa">Pag-Asa</option>
+    <option value="San Juan Acffa">San Juan Acffa</option>
+    <option value="San Roque Norte">San Roque Norte</option>
+    <option value="San Roque Sur">San Roque Sur</option>
+    <option value="Sanbermicristi">Sanbermicristi</option>
+    <option value="Sumacab Este">Sumacab Este</option>
+    <option value="Valdefuente">Valdefuente</option>
+  </select>
 </div>
 
+<!-- Patient History Table -->
 <div class="table-responsive">
-  <table class="table table-bordered table-striped" id="historyTable">
+  <table class="table table-bordered table-striped">
     <thead class="table-dark">
       <tr>
         <th>Date</th>
@@ -382,10 +391,6 @@ window.exportExcel = async function(){
     </thead>
     <tbody id="history"></tbody>
   </table>
-</div>
-
-<div class="mb-4">
-  <button class="btn btn-warning" onclick="exportExcel()">Export Excel</button>
 </div>
 </body>
 </html>
