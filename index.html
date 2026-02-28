@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Medicine Inventory System</title>
+<title>Medicine Inventory System - Firestore</title>
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
 <style>
 .badge-lowstock { 
@@ -16,7 +16,7 @@
 <body class="bg-light">
 
 <div class="container my-4">
-  <h1 class="text-center mb-4">Medicine Inventory System</h1>
+  <h1 class="text-center mb-4">Medicine Inventory System (Firestore)</h1>
 
   <!-- DASHBOARD -->
   <div class="row mb-4">
@@ -172,21 +172,21 @@
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.10.0/firebase-app.js";
-import { getDatabase, ref, push, onValue, update, remove } from "https://www.gstatic.com/firebasejs/12.10.0/firebase-database.js";
+import { getFirestore, collection, addDoc, onSnapshot, doc, updateDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/12.10.0/firebase-firestore.js";
 
 document.addEventListener("DOMContentLoaded", ()=>{
   const firebaseConfig = {
     apiKey: "AIzaSyDkuo0jjGYIBC1MKOWD42XvcB4nWy_72qQ",
     authDomain: "medicine-inventory-cc500.firebaseapp.com",
-    databaseURL: "https://medicine-inventory-cc500-default-rtdb.asia-southeast1.firebasedatabase.app/",
     projectId: "medicine-inventory-cc500",
     storageBucket: "medicine-inventory-cc500.appspot.com",
     messagingSenderId: "1044916941588",
     appId: "1:1044916941588:web:ef2a8ee26f23b24d07c801",
     measurementId: "G-BB4NQX65NN"
   };
+
   const app = initializeApp(firebaseConfig);
-  const db = getDatabase(app);
+  const db = getFirestore(app);
 
   let adultData={}, pediaData={};
 
@@ -205,46 +205,47 @@ document.addEventListener("DOMContentLoaded", ()=>{
     document.getElementById("totalPediaValue").innerText = "₱"+totalPediaValue.toFixed(2);
   }
 
-  /* ===== ADULT ===== */
+  /* ===== ADULT MEDICINE ===== */
   const adultForm=document.getElementById("adultForm");
-  adultForm.addEventListener("submit", e=>{
+  adultForm.addEventListener("submit", async e=>{
     e.preventDefault();
-    const name = document.getElementById("adultName").value.trim();
-    const mg = document.getElementById("adultMg").value.trim();
-    const type = document.getElementById("adultType").value;
-    const price = parseFloat(document.getElementById("adultPrice").value);
-    const qty = parseInt(document.getElementById("adultQty").value);
+    const name=document.getElementById("adultName").value.trim();
+    const mg=document.getElementById("adultMg").value.trim();
+    const type=document.getElementById("adultType").value;
+    const price=parseFloat(document.getElementById("adultPrice").value);
+    const qty=parseInt(document.getElementById("adultQty").value);
 
-    // check duplicate
-    const duplicate = Object.values(adultData).some(d=>d.name===name && d.mg===mg+" "+type);
-    if(duplicate){alert("Already exists!"); return;}
+    // Check duplicate
+    const exists = Object.values(adultData).some(d=>d.name===name && d.mg===mg+" "+type);
+    if(exists){alert("Already exists!"); return;}
 
-    push(ref(db,"adult_medicine"),{name, mg:mg+" "+type, price, qty});
+    await addDoc(collection(db,"adult_medicine"),{name, mg:mg+" "+type, price, qty});
     adultForm.reset();
   });
 
-  onValue(ref(db,"adult_medicine"), snapshot=>{
+  // Listen to Adult Collection
+  onSnapshot(collection(db,"adult_medicine"), snapshot=>{
     const adultTable=document.getElementById("adultTable");
     adultTable.innerHTML=""; adultData={};
-    snapshot.forEach(child=>{
-      adultData[child.key]=child.val();
-      const low=parseInt(child.val().qty)<10;
+    snapshot.forEach(docSnap=>{
+      const d=docSnap.data(); adultData[docSnap.id]=d;
+      const low=d.qty<10;
       adultTable.innerHTML+=`
       <tr class="${low?'low-stock':''}">
-        <td>${child.val().name} ${low?'<span class="badge-lowstock">LOW STOCK</span>':''}</td>
-        <td>${child.val().mg}</td>
-        <td><input type="number" class="form-control form-control-sm" value="${child.val().price}" onchange="updatePrice('adult','${child.key}',this.value)"></td>
-        <td><input type="number" class="form-control form-control-sm" value="${child.val().qty}" onchange="updateStock('adult','${child.key}',this.value)"></td>
+        <td>${d.name} ${low?'<span class="badge-lowstock">LOW STOCK</span>':''}</td>
+        <td>${d.mg}</td>
+        <td><input type="number" class="form-control form-control-sm" value="${d.price}" onchange="updatePrice('adult','${docSnap.id}',this.value)"></td>
+        <td><input type="number" class="form-control form-control-sm" value="${d.qty}" onchange="updateStock('adult','${docSnap.id}',this.value)"></td>
         <td>
-          <button class="btn btn-sm btn-primary" onclick="deductStock('${child.key}')">Dispense</button>
-          <button class="btn btn-sm btn-danger" onclick="deleteItem('adult','${child.key}')">Delete</button>
+          <button class="btn btn-sm btn-primary" onclick="deductStock('${docSnap.id}')">Dispense</button>
+          <button class="btn btn-sm btn-danger" onclick="deleteItem('adult','${docSnap.id}')">Delete</button>
         </td>
       </tr>`;
     });
     updateDashboard();
   });
 
-  /* ===== PEDIATRIC ===== */
+  /* ===== PEDIATRIC MEDICINE ===== */
   const pediaForm=document.getElementById("pediaForm");
   const pediaTotal=document.getElementById("pediaTotal");
   function updatePediaTotal(){ 
@@ -255,7 +256,7 @@ document.addEventListener("DOMContentLoaded", ()=>{
   document.getElementById("pediaPrice").addEventListener("input",updatePediaTotal);
   document.getElementById("pediaQty").addEventListener("input",updatePediaTotal);
 
-  pediaForm.addEventListener("submit", e=>{
+  pediaForm.addEventListener("submit", async e=>{
     e.preventDefault();
     const name=document.getElementById("pediaName").value.trim();
     const mg=document.getElementById("pediaMg").value.trim();
@@ -265,39 +266,78 @@ document.addEventListener("DOMContentLoaded", ()=>{
     const qty=parseInt(document.getElementById("pediaQty").value);
 
     // check duplicate
-    const duplicate=Object.values(pediaData).some(d=>d.name===name && d.mg===mg+" "+unit && d.type===type);
+    const duplicate = Object.values(pediaData).some(d=>d.name===name && d.mg===mg+" "+unit && d.type===type);
     if(duplicate){alert("Already exists!"); return;}
 
-    push(ref(db,"pedia_medicine"),{name, mg:mg+" "+unit, type, price, quantity:qty, total:price*qty});
+    await addDoc(collection(db,"pedia_medicine"),{name, mg:mg+" "+unit, type, price, quantity:qty, total:price*qty});
     pediaForm.reset();
     pediaTotal.value="";
   });
 
-  onValue(ref(db,"pedia_medicine"), snapshot=>{
+  // Listen to Pediatric Collection
+  onSnapshot(collection(db,"pedia_medicine"), snapshot=>{
     const pediaTable=document.getElementById("pediaTable");
     pediaTable.innerHTML=""; pediaData={};
-    snapshot.forEach(child=>{
-      pediaData[child.key]=child.val();
+    snapshot.forEach(docSnap=>{
+      const d=docSnap.data(); pediaData[docSnap.id]=d;
       pediaTable.innerHTML+=`
       <tr>
-        <td>${child.val().name}</td>
-        <td>${child.val().mg}</td>
-        <td>${child.val().type}</td>
-        <td><input type="number" class="form-control form-control-sm" value="${child.val().price}" onchange="updatePrice('pedia','${child.key}',this.value)"></td>
-        <td><input type="number" class="form-control form-control-sm" value="${child.val().quantity}" onchange="updateStock('pedia','${child.key}',this.value)"></td>
-        <td>₱${child.val().total}</td>
-        <td><button class="btn btn-sm btn-danger" onclick="deleteItem('pedia','${child.key}')">Delete</button></td>
+        <td>${d.name}</td>
+        <td>${d.mg}</td>
+        <td>${d.type}</td>
+        <td><input type="number" class="form-control form-control-sm" value="${d.price}" onchange="updatePrice('pedia','${docSnap.id}',this.value)"></td>
+        <td><input type="number" class="form-control form-control-sm" value="${d.quantity}" onchange="updateStock('pedia','${docSnap.id}',this.value)"></td>
+        <td>₱${d.total}</td>
+        <td><button class="btn btn-sm btn-danger" onclick="deleteItem('pedia','${docSnap.id}')">Delete</button></td>
       </tr>`;
     });
     updateDashboard();
   });
 
-  /* ===== DISPENSING HISTORY ===== */
+  /* ===== FUNCTIONS ===== */
+  window.updatePrice=async (type,id,value)=>{
+    value=parseFloat(value); if(isNaN(value)||value<0)return;
+    const docRef=doc(db,type==="adult"?"adult_medicine":"pedia_medicine",id);
+    if(type==="adult") await updateDoc(docRef,{price:value});
+    else await updateDoc(docRef,{price:value,total:value*parseFloat(pediaData[id].quantity)});
+    updateDashboard();
+  };
+
+  window.updateStock=async (type,id,value)=>{
+    value=parseInt(value); if(isNaN(value)||value<0)return;
+    const docRef=doc(db,type==="adult"?"adult_medicine":"pedia_medicine",id);
+    if(type==="adult") await updateDoc(docRef,{qty:value});
+    else await updateDoc(docRef,{quantity:value,total:value*parseFloat(pediaData[id].price)});
+    updateDashboard();
+  };
+
+  window.deleteItem=async (type,id)=>{
+    if(!confirm("Delete this item?")) return;
+    await deleteDoc(doc(db,type==="adult"?"adult_medicine":"pedia_medicine",id));
+    updateDashboard();
+  };
+
+  window.deductStock=async (id)=>{
+    const qty=parseInt(prompt("Enter quantity to dispense:")); 
+    if(isNaN(qty)||qty<=0||qty>adultData[id].qty){alert("Invalid");return;}
+    const newQty=adultData[id].qty-qty;
+    await updateDoc(doc(db,"adult_medicine",id),{qty:newQty});
+    await addDoc(collection(db,"dispense_logs"),{
+      medicine:adultData[id].name,
+      milligram:adultData[id].mg,
+      quantity_dispensed:qty,
+      remaining_stock:newQty,
+      date:new Date().toLocaleString()
+    });
+    updateDashboard();
+  };
+
+  // Listen to dispensing logs
   const historyTable=document.getElementById("historyTable");
-  onValue(ref(db,"dispense_logs"), snapshot=>{
+  onSnapshot(collection(db,"dispense_logs"), snapshot=>{
     historyTable.innerHTML="";
-    snapshot.forEach(child=>{
-      const d=child.val();
+    snapshot.forEach(docSnap=>{
+      const d=docSnap.data();
       historyTable.innerHTML+=`
         <tr>
           <td>${d.date}</td>
@@ -308,44 +348,6 @@ document.addEventListener("DOMContentLoaded", ()=>{
         </tr>`;
     });
   });
-
-  /* ===== FUNCTIONS ===== */
-  window.updatePrice=(type,key,value)=>{
-    value=parseFloat(value); if(isNaN(value)||value<0)return;
-    const path=type==="adult"?"adult_medicine/"+key:"pedia_medicine/"+key;
-    const updateObj=type==="adult"?{price:value}:{price:value,total:value*parseFloat(pediaData[key].quantity)};
-    update(ref(db,path),updateObj);
-    setTimeout(updateDashboard,200);
-  };
-
-  window.updateStock=(type,key,value)=>{
-    value=parseInt(value); if(isNaN(value)||value<0)return;
-    const path=type==="adult"?"adult_medicine/"+key:"pedia_medicine/"+key;
-    const updateObj=type==="adult"?{qty:value}:{quantity:value,total:value*parseFloat(pediaData[key].price)};
-    update(ref(db,path),updateObj);
-    setTimeout(updateDashboard,200);
-  };
-
-  window.deductStock=(key)=>{
-    const qty=parseInt(prompt("Enter quantity to dispense:")); 
-    if(isNaN(qty)||qty<=0||qty>adultData[key].qty){alert("Invalid");return;}
-    const newQty=adultData[key].qty-qty;
-    update(ref(db,"adult_medicine/"+key),{qty:newQty});
-    push(ref(db,"dispense_logs"),{
-      medicine:adultData[key].name,
-      milligram:adultData[key].mg,
-      quantity_dispensed:qty,
-      remaining_stock:newQty,
-      date:new Date().toLocaleString()
-    });
-    setTimeout(updateDashboard,200);
-  };
-
-  window.deleteItem=(type,key)=>{
-    if(!confirm("Delete this item?")) return;
-    remove(ref(db,type==="adult"?"adult_medicine/"+key:"pedia_medicine/"+key));
-    setTimeout(updateDashboard,200);
-  };
 });
 </script>
 
