@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<title>Medical Mission System</title>
+<title>CLIENT'S PROFILE</title>
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
@@ -25,13 +25,14 @@ const firebaseConfig = {
   storageBucket: "medicine-inventory-cc500.firebasestorage.app",
   messagingSenderId: "1044916941588",
   appId: "1:1044916941588:web:ef2a8ee26f23b24d07c801",
-  measurementId: "G-BB4NQX65NN"
+  measurementId: "G-BB4NQ65NN"
 };
 
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
 let currentCollection = "";
+let selectedMedicinesList = [];
 
 // Medicine Type select
 document.getElementById("medicineType")?.addEventListener("change", (e)=>{
@@ -40,6 +41,8 @@ document.getElementById("medicineType")?.addEventListener("change", (e)=>{
   currentCollection = type==="Adult"?"adult_medicine":"pedia_medicine";
   document.getElementById("medicineSearch").value="";
   document.getElementById("medicineResults").innerHTML="";
+  selectedMedicinesList = [];
+  renderSelectedMedicines();
 });
 
 // Search medicine
@@ -63,23 +66,65 @@ window.searchMedicine = async function() {
   });
 };
 
-// Select medicine
-function selectMedicine(id,data){
-  const search = document.getElementById("medicineSearch");
-  search.value=data.name;
-  search.dataset.id=id;
-  document.getElementById("price").value=data.price;
-  document.getElementById("quantity").value=1;
-  computeTotal();
-  document.getElementById("medicineResults").innerHTML="";
+// Select medicine and add to list
+function selectMedicine(id, data) {
+  if(selectedMedicinesList.find(m => m.id === id)) {
+    alert("Medicine already added!");
+    return;
+  }
+
+  const medEntry = {
+    id,
+    name: data.name,
+    mg: data.mg,
+    price: data.price,
+    quantity: 1,
+    total: data.price
+  };
+  selectedMedicinesList.push(medEntry);
+  renderSelectedMedicines();
+  document.getElementById("medicineSearch").value = "";
+  document.getElementById("medicineResults").innerHTML = "";
 }
 
-// Compute total
-window.computeTotal=function(){
-  const qty=parseFloat(document.getElementById("quantity").value)||0;
-  const price=parseFloat(document.getElementById("price").value)||0;
-  document.getElementById("amount").value=(qty*price).toFixed(2);
-};
+// Render the selected medicines and grand total
+function renderSelectedMedicines() {
+  const container = document.getElementById("selectedMedicines");
+  container.innerHTML = "";
+  let grandTotal = 0;
+
+  selectedMedicinesList.forEach((med, index) => {
+    grandTotal += parseFloat(med.total);
+
+    const div = document.createElement("div");
+    div.className = "d-flex align-items-center mb-1 gap-2";
+    div.innerHTML = `
+      <span>${med.name} - ${med.mg}</span>
+      <input type="number" value="${med.quantity}" min="1" style="width:60px;" onchange="updateMedicineQty(${index}, this.value)">
+      <input type="number" value="${med.total}" style="width:80px;" readonly>
+      <button type="button" class="btn btn-sm btn-danger" onclick="removeMedicine(${index})">Remove</button>
+    `;
+    container.appendChild(div);
+  });
+
+  // Update grand total display
+  document.getElementById("grandTotal").textContent = grandTotal.toFixed(2);
+}
+
+// Update quantity
+function updateMedicineQty(index, qty) {
+  qty = parseInt(qty);
+  if(qty <= 0) return;
+  selectedMedicinesList[index].quantity = qty;
+  selectedMedicinesList[index].total = (qty * selectedMedicinesList[index].price).toFixed(2);
+  renderSelectedMedicines(); // re-render to update totals
+}
+
+// Remove medicine
+function removeMedicine(index) {
+  selectedMedicinesList.splice(index, 1);
+  renderSelectedMedicines(); // re-render to update totals
+}
 
 // Toggle barangay textbox
 window.toggleBarangayTextbox = function(){
@@ -94,56 +139,58 @@ window.toggleBarangayTextbox = function(){
 };
 
 // Add patient record
-window.addRecord=async function(){
-  const patientName=document.getElementById("patientName").value.trim();
-  const date=document.getElementById("date").value;
-  const selectedBarangay=document.getElementById("barangaySelect").value;
+window.addRecord = async function() {
+  const patientName = document.getElementById("patientName").value.trim();
+  const date = document.getElementById("date").value;
+  const selectedBarangay = document.getElementById("barangaySelect").value;
   const barangay = selectedBarangay==="Other"?document.getElementById("barangayTextbox").value.trim():selectedBarangay;
   const problem = document.getElementById("problem").value.trim();
   const blockLeader = document.getElementById("blockLeader").value.trim();
-  const medId=document.getElementById("medicineSearch").dataset.id;
-  const qty=parseInt(document.getElementById("quantity").value);
-  const price=parseFloat(document.getElementById("price").value);
-  const total=parseFloat(document.getElementById("amount").value);
-  const medType=document.getElementById("medicineType").value;
+  const medType = document.getElementById("medicineType").value;
 
-  if(!patientName || !date || !barangay || !problem || !blockLeader || !medId || !medType){
-    alert("Please fill all required fields!"); 
+  if(!patientName || !date || !barangay || !problem || !blockLeader || !medType || selectedMedicinesList.length === 0){
+    alert("Please fill all required fields and select at least one medicine!"); 
     return;
   }
 
-  // Check stock
-  const medRef = doc(db, currentCollection, medId);
-  const medSnap = await getDoc(medRef);
-  const medData = medSnap.data();
-  if(!medData){
-    alert("Medicine not found!");
-    return;
-  }
-  if(qty > medData.qty || qty <= 0){
-    alert("Invalid quantity!");
-    return;
+  // Check stock for all medicines
+  for(const med of selectedMedicinesList){
+    const medRef = doc(db, currentCollection, med.id);
+    const medSnap = await getDoc(medRef);
+    const medData = medSnap.data();
+    if(!medData) { alert(`Medicine ${med.name} not found!`); return; }
+    if(med.quantity > medData.qty){ alert(`Not enough stock for ${med.name}!`); return; }
   }
 
   // Deduct stock
-  await updateDoc(medRef, { qty: medData.qty - qty });
+  for(const med of selectedMedicinesList){
+    const medRef = doc(db, currentCollection, med.id);
+    const medSnap = await getDoc(medRef);
+    const medData = medSnap.data();
+    await updateDoc(medRef, { qty: medData.qty - med.quantity });
+  }
 
-  // Save record
+  // Save record with all medicines
   await addDoc(collection(db,"medical_records"),{
     patientName,
     date,
     barangay,
     problem,
     blockLeader,
-    medicineType:medType,
-    medicine:medData.name,
-    mg:medData.mg,
-    quantity:qty,
-    price_at_time:price,
-    total
+    medicineType: medType,
+    medicines: selectedMedicinesList.map(m=>({
+      name: m.name,
+      mg: m.mg,
+      quantity: m.quantity,
+      price_at_time: m.price,
+      total: parseFloat(m.total)
+    })),
+    total: selectedMedicinesList.reduce((sum,m)=>sum + parseFloat(m.total),0)
   });
 
   alert("Record Saved!");
+  selectedMedicinesList = [];
+  renderSelectedMedicines();
   loadHistory();
 
   // Reset form
@@ -154,11 +201,6 @@ window.addRecord=async function(){
   document.getElementById("problem").value="";
   document.getElementById("blockLeader").value="";
   document.getElementById("medicineType").value="";
-  document.getElementById("medicineSearch").value="";
-  document.getElementById("price").value="";
-  document.getElementById("quantity").value="";
-  document.getElementById("amount").value="";
-  document.getElementById("medicineSearch").dataset.id="";
 };
 
 // Load patient history
@@ -168,7 +210,8 @@ async function loadHistory(){
   table.innerHTML = "";
   snapshot.forEach(docSnap=>{
     const d = docSnap.data();
-    table.innerHTML+=`
+    const meds = d.medicines.map(m=>`${m.name} (${m.quantity})`).join(", ");
+    table.innerHTML += `
       <tr>
         <td>${d.date}</td>
         <td>${d.patientName}</td>
@@ -176,8 +219,7 @@ async function loadHistory(){
         <td>${d.problem}</td>
         <td>${d.blockLeader}</td>
         <td>${d.medicineType}</td>
-        <td>${d.medicine}</td>
-        <td>${d.quantity}</td>
+        <td>${meds}</td>
         <td>${d.total}</td>
       </tr>`;
   });
@@ -251,13 +293,11 @@ window.exportExcel=async function(){
     <div class="col-md-3">
       <input type="text" class="form-control" id="medicineSearch" placeholder="Search medicine..." oninput="searchMedicine()">
       <div id="medicineResults" class="list-group position-absolute w-100" style="z-index:10;"></div>
+      <div id="selectedMedicines" class="mt-2"></div>
+      <div class="mt-1 d-flex justify-content-end">
+        <strong>Total: ₱ <span id="grandTotal">0.00</span></strong>
+      </div>
     </div>
-  </div>
-  <div class="row g-2 mt-2">
-    <div class="col-md-1"><input type="number" class="form-control" id="quantity" placeholder="Qty" oninput="computeTotal()"></div>
-    <div class="col-md-2"><input type="number" class="form-control" id="price" placeholder="Price" step="0.01" oninput="computeTotal()"></div>
-    <div class="col-md-2"><input type="number" class="form-control" id="amount" placeholder="Total" step="0.01" readonly></div>
-    <div class="col-md-2"><button class="btn btn-primary w-100" onclick="addRecord()">Save</button></div>
   </div>
 </div>
 
@@ -272,8 +312,7 @@ window.exportExcel=async function(){
         <th>Problem</th>
         <th>Block Leader</th>
         <th>Type</th>
-        <th>Medicine</th>
-        <th>Qty</th>
+        <th>Medicines</th>
         <th>Total</th>
       </tr>
     </thead>
@@ -283,6 +322,7 @@ window.exportExcel=async function(){
 
 <div class="mb-4">
   <button class="btn btn-warning" onclick="exportExcel()">Export Excel</button>
+  <button class="btn btn-primary" onclick="addRecord()">Save</button>
 </div>
 </body>
 </html>
