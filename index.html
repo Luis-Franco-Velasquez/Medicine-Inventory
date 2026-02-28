@@ -3,6 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <title>Medical Mission System</title>
+<!-- Bootstrap CSS -->
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
@@ -36,96 +38,69 @@ const db = getFirestore(app);
 
 let currentCollection = "";
 
-/* =========================
-   LOAD MEDICINES
-========================= */
+/* Load medicines into dropdown */
 async function loadMedicines(type) {
-  currentCollection = type === "Adult"
-    ? "adult_medicines"
-    : "pedia_medicines";
-
+  currentCollection = type === "Adult" ? "adult_medicines" : "pedia_medicines";
   const dropdown = document.getElementById("medicine");
   dropdown.innerHTML = `<option value="">Select Medicine</option>`;
-
   const snapshot = await getDocs(collection(db, currentCollection));
-
   snapshot.forEach(docSnap => {
     const data = docSnap.data();
     const option = document.createElement("option");
     option.value = docSnap.id;
-
     if (data.qty < 10) {
       option.textContent = `⚠ ${data.name} - ${data.mg} (LOW: ${data.qty})`;
       option.style.color = "red";
     } else {
       option.textContent = `${data.name} - ${data.mg} (Stock: ${data.qty})`;
     }
-
     dropdown.appendChild(option);
   });
 }
 
-/* =========================
-   AUTO FILL PRICE
-========================= */
+/* Auto-fill price on medicine select */
 document.addEventListener("change", async (e) => {
   if (e.target.id === "medicine") {
     const id = e.target.value;
     if (!id) return;
-
     const ref = doc(db, currentCollection, id);
     const snap = await getDoc(ref);
     const data = snap.data();
-
     document.getElementById("price").value = data.price;
     computeTotal();
   }
 });
 
-/* =========================
-   COMPUTE TOTAL
-========================= */
+/* Compute total */
 function computeTotal() {
   const qty = parseFloat(document.getElementById("quantity").value) || 0;
   const price = parseFloat(document.getElementById("price").value) || 0;
   document.getElementById("amount").value = (qty * price).toFixed(2);
 }
-
 window.computeTotal = computeTotal;
 
-/* =========================
-   ADD RECORD
-========================= */
+/* Add record */
 window.addRecord = async function() {
-
   const patientName = document.getElementById("patientName").value;
   const date = document.getElementById("date").value;
-  const barangay = document.getElementById("barangay").value;
+  let barangay = document.getElementById("barangay").value;
   const medicineId = document.getElementById("medicine").value;
   const quantity = parseInt(document.getElementById("quantity").value);
   const price = parseFloat(document.getElementById("price").value);
   const amount = parseFloat(document.getElementById("amount").value);
 
-  if (!medicineId || !currentCollection) {
-    alert("Select medicine type & medicine");
-    return;
-  }
+  if (!medicineId || !currentCollection) { alert("Select medicine type & medicine"); return; }
 
   const ref = doc(db, currentCollection, medicineId);
   const snap = await getDoc(ref);
   const med = snap.data();
 
-  if (quantity <= 0 || quantity > med.qty) {
-    alert("Invalid quantity or insufficient stock!");
-    return;
-  }
+  if (quantity <= 0 || quantity > med.qty) { alert("Invalid quantity or insufficient stock!"); return; }
 
-  // Deduct stock safely
-  await updateDoc(ref, {
-    qty: med.qty - quantity
-  });
+  // Deduct stock
+  await updateDoc(ref, { qty: med.qty - quantity });
 
-  // Save record with price at time
+  // Save record
   await addDoc(collection(db, "medical_records"), {
     patientName,
     date,
@@ -142,19 +117,15 @@ window.addRecord = async function() {
   loadHistory();
 };
 
-/* =========================
-   LOAD PATIENT HISTORY
-========================= */
+/* Load patient history */
 async function loadHistory() {
   const snapshot = await getDocs(collection(db, "medical_records"));
   const table = document.getElementById("history");
   table.innerHTML = "";
-
   snapshot.forEach(docSnap => {
     const d = docSnap.data();
-
     table.innerHTML += `
-      <tr>
+      <tr class="${d.quantity < 10 ? 'table-danger' : ''}">
         <td>${d.date}</td>
         <td>${d.patientName}</td>
         <td>${d.barangay}</td>
@@ -162,113 +133,105 @@ async function loadHistory() {
         <td>${d.medicine}</td>
         <td>${d.quantity}</td>
         <td>${d.total}</td>
-        <td><button onclick="viewPatient('${d.patientName}')">View</button></td>
-      </tr>
-    `;
+        <td><button class="btn btn-sm btn-primary" onclick="viewPatient('${d.patientName}')">View</button></td>
+      </tr>`;
   });
 }
-
 window.viewPatient = async function(name) {
   const q = query(collection(db,"medical_records"),where("patientName","==",name));
   const snapshot = await getDocs(q);
   let msg = "Patient History:\n\n";
-  snapshot.forEach(doc=> {
-    const d = doc.data();
-    msg += `${d.date} - ${d.medicine} (${d.quantity})\n`;
-  });
+  snapshot.forEach(doc=>{ const d = doc.data(); msg += `${d.date} - ${d.medicine} (${d.quantity})\n`; });
   alert(msg);
 };
 
-/* =========================
-   MONTHLY SUMMARY
-========================= */
+/* Monthly summary */
 window.monthlySummary = async function() {
   const snapshot = await getDocs(collection(db,"medical_records"));
   const summary = {};
-
   snapshot.forEach(doc=>{
     const d = doc.data();
     const month = d.date.substring(0,7);
-    if(!summary[month]) summary[month] = {};
-    if(!summary[month][d.barangay]) summary[month][d.barangay] = 0;
-    summary[month][d.barangay] += d.total;
+    if(!summary[month]) summary[month]={};
+    if(!summary[month][d.barangay]) summary[month][d.barangay]=0;
+    summary[month][d.barangay]+=d.total;
   });
-
   console.log(summary);
   alert("Check console for summary.");
 };
 
-/* =========================
-   EXPORT EXCEL
-========================= */
+/* Export Excel */
 window.exportExcel = async function() {
   const snapshot = await getDocs(collection(db,"medical_records"));
-  const data = [];
-
-  snapshot.forEach(doc=>{
-    data.push(doc.data());
-  });
-
-  const ws = XLSX.utils.json_to_sheet(data);
-  const wb = XLSX.utils.book_new();
+  const data=[];
+  snapshot.forEach(doc=>data.push(doc.data()));
+  const ws=XLSX.utils.json_to_sheet(data);
+  const wb=XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, "Records");
   XLSX.writeFile(wb,"Medical_Report.xlsx");
 };
 
 loadHistory();
+
 </script>
 
-<style>
-body { font-family: Arial; padding:20px; background:#f4f6f9; }
-input,select,button { padding:6px; margin:5px; }
-table { width:100%; border-collapse:collapse; margin-top:20px; }
-th,td { border:1px solid #ccc; padding:8px; text-align:center; }
-th { background:#007bff; color:white; }
-</style>
 </head>
 
-<body>
+<body class="container py-4">
 
-<h2>Medical Mission System</h2>
-
-<!-- PATIENT FORM -->
-<div>
-  <input type="text" id="patientName" placeholder="Patient Name">
-  <input type="date" id="date">
-  <input type="text" id="barangay" placeholder="Barangay">
-  <select id="medicineType" onchange="loadMedicines(this.value)">
-    <option value="">Select Type</option>
-    <option>Adult</option>
-    <option>Pedia</option>
-  </select>
-  <select id="medicine"></select>
-  <input type="number" id="quantity" placeholder="Qty" oninput="computeTotal()">
-  <input type="number" id="price" placeholder="Price" step="0.01" oninput="computeTotal()">
-  <input type="number" id="amount" placeholder="Total" step="0.01">
-  <button onclick="addRecord()">Save</button>
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h2>Medical Mission System</h2>
+  <a href="inventory.html" class="btn btn-success">View Inventory</a>
 </div>
 
-<!-- HISTORY -->
-<h3>Patient History</h3>
-<table>
-<thead>
-<tr>
-<th>Date</th>
-<th>Name</th>
-<th>Barangay</th>
-<th>Type</th>
-<th>Medicine</th>
-<th>Qty</th>
-<th>Total</th>
-<th>Action</th>
-</tr>
-</thead>
-<tbody id="history"></tbody>
-</table>
+<!-- Patient Form -->
+<div class="card p-3 mb-4">
+  <div class="row g-2">
+    <div class="col-md-3"><input type="text" class="form-control" id="patientName" placeholder="Patient Name"></div>
+    <div class="col-md-2"><input type="date" class="form-control" id="date"></div>
+    <div class="col-md-2"><input type="text" class="form-control" id="barangay" placeholder="Barangay"></div>
+    <div class="col-md-2">
+      <select class="form-select" id="medicineType" onchange="loadMedicines(this.value)">
+        <option value="">Select Type</option>
+        <option>Adult</option>
+        <option>Pedia</option>
+      </select>
+    </div>
+    <div class="col-md-3">
+      <select class="form-select" id="medicine"></select>
+    </div>
+  </div>
+  <div class="row g-2 mt-2">
+    <div class="col-md-1"><input type="number" class="form-control" id="quantity" placeholder="Qty" oninput="computeTotal()"></div>
+    <div class="col-md-2"><input type="number" class="form-control" id="price" placeholder="Price" step="0.01" oninput="computeTotal()"></div>
+    <div class="col-md-2"><input type="number" class="form-control" id="amount" placeholder="Total" step="0.01"></div>
+    <div class="col-md-2"><button class="btn btn-primary w-100" onclick="addRecord()">Save</button></div>
+  </div>
+</div>
 
-<br>
-<button onclick="monthlySummary()">Monthly Summary</button>
-<button onclick="exportExcel()">Export Excel</button>
+<!-- Patient History Table -->
+<div class="table-responsive">
+  <table class="table table-bordered table-striped">
+    <thead class="table-dark">
+      <tr>
+        <th>Date</th>
+        <th>Name</th>
+        <th>Barangay</th>
+        <th>Type</th>
+        <th>Medicine</th>
+        <th>Qty</th>
+        <th>Total</th>
+        <th>Action</th>
+      </tr>
+    </thead>
+    <tbody id="history"></tbody>
+  </table>
+</div>
+
+<div class="mb-4">
+  <button class="btn btn-info me-2" onclick="monthlySummary()">Monthly Summary</button>
+  <button class="btn btn-warning" onclick="exportExcel()">Export Excel</button>
+</div>
 
 </body>
 </html>

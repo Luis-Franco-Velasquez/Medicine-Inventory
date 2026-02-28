@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Medicine Inventory</title>
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { getFirestore, collection, getDocs, doc, updateDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyDkuo0jjGYIBC1MKOWD42XvcB4nWy_72qQ",
+  authDomain: "medicine-inventory-cc500.firebaseapp.com",
+  databaseURL: "https://medicine-inventory-cc500-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "medicine-inventory-cc500",
+  storageBucket: "medicine-inventory-cc500.firebasestorage.app",
+  messagingSenderId: "1044916941588",
+  appId: "1:1044916941588:web:ef2a8ee26f23b24d07c801",
+  measurementId: "G-BB4NQX65NN"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+
+/* Load medicines */
+async function loadTable(collectionName, tableId) {
+  const snapshot = await getDocs(collection(db, collectionName));
+  const table = document.getElementById(tableId);
+  table.innerHTML = "";
+  snapshot.forEach(docSnap => {
+    const data = docSnap.data();
+    const row = document.createElement("tr");
+    row.innerHTML = `
+      <td><input type="text" class="form-control" value="${data.name}" id="name-${docSnap.id}"></td>
+      <td><input type="text" class="form-control" value="${data.mg}" id="mg-${docSnap.id}"></td>
+      <td><input type="number" class="form-control" step="0.01" value="${data.price}" id="price-${docSnap.id}"></td>
+      <td><input type="number" class="form-control" value="${data.qty}" id="qty-${docSnap.id}" style="${data.qty<10?'color:red;font-weight:bold;':''}"></td>
+      <td><button class="btn btn-primary btn-sm w-100" onclick="updateMedicine('${collectionName}','${docSnap.id}')">Save</button></td>
+    `;
+    table.appendChild(row);
+  });
+}
+
+/* Update medicine */
+window.updateMedicine = async function(collectionName,id){
+  const name=document.getElementById(`name-${id}`).value;
+  const mg=document.getElementById(`mg-${id}`).value;
+  const price=parseFloat(document.getElementById(`price-${id}`).value);
+  const qty=parseInt(document.getElementById(`qty-${id}`).value);
+  if(qty<0){alert("Quantity cannot be negative!"); return;}
+  const ref=doc(db,collectionName,id);
+  await updateDoc(ref,{name,mg,price,qty});
+  alert("Medicine Updated!");
+  loadTable(collectionName,collectionName==="adult_medicines"?"adultTable":"pediaTable");
+}
+
+/* Initial load */
+loadTable("adult_medicines","adultTable");
+loadTable("pedia_medicines","pediaTable");
+</script>
+</head>
+
+<body class="container py-4">
+<h1 class="mb-4">Medicine Inventory Management</h1>
+
+<h2>Adult Medicines</h2>
+<div class="table-responsive mb-4">
+  <table class="table table-bordered table-striped">
+    <thead class="table-dark">
+      <tr><th>Name</th><th>Dosage (mg)</th><th>Price</th><th>Quantity</th><th>Action</th></tr>
+    </thead>
+    <tbody id="adultTable"></tbody>
+  </table>
+</div>
+
+<h2>Pedia Medicines</h2>
+<div class="table-responsive mb-4">
+  <table class="table table-bordered table-striped">
+    <thead class="table-dark">
+      <tr><th>Name</th><th>Dosage (mg/ml)</th><th>Price</th><th>Quantity</th><th>Action</th></tr>
+    </thead>
+    <tbody id="pediaTable"></tbody>
+  </table>
+</div>
+
+</body>
+</html>
