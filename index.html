@@ -5,7 +5,6 @@
 <title>Medical Mission System</title>
 <!-- Bootstrap CSS -->
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
-
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import {
@@ -19,13 +18,12 @@ import {
   query,
   where
 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
-
 import * as XLSX from "https://cdn.jsdelivr.net/npm/xlsx@0.18.5/+esm";
 
+/* Firebase Config */
 const firebaseConfig = {
   apiKey: "AIzaSyDkuo0jjGYIBC1MKOWD42XvcB4nWy_72qQ",
   authDomain: "medicine-inventory-cc500.firebaseapp.com",
-  databaseURL: "https://medicine-inventory-cc500-default-rtdb.asia-southeast1.firebasedatabase.app",
   projectId: "medicine-inventory-cc500",
   storageBucket: "medicine-inventory-cc500.firebasestorage.app",
   messagingSenderId: "1044916941588",
@@ -40,7 +38,7 @@ let currentCollection = "";
 
 /* Load medicines into dropdown */
 async function loadMedicines(type) {
-  currentCollection = type === "Adult" ? "adult_medicines" : "pedia_medicines";
+  currentCollection = type === "Adult" ? "adult_medicine" : "pedia_medicine";
   const dropdown = document.getElementById("medicine");
   dropdown.innerHTML = `<option value="">Select Medicine</option>`;
   const snapshot = await getDocs(collection(db, currentCollection));
@@ -83,7 +81,7 @@ window.computeTotal = computeTotal;
 window.addRecord = async function() {
   const patientName = document.getElementById("patientName").value;
   const date = document.getElementById("date").value;
-  let barangay = document.getElementById("barangay").value;
+  const barangay = document.getElementById("barangay").value;
   const medicineId = document.getElementById("medicine").value;
   const quantity = parseInt(document.getElementById("quantity").value);
   const price = parseFloat(document.getElementById("price").value);
@@ -172,13 +170,10 @@ window.exportExcel = async function() {
 };
 
 loadHistory();
-
 </script>
-
 </head>
 
 <body class="container py-4">
-
 <div class="d-flex justify-content-between align-items-center mb-3">
   <h2>Medical Mission System</h2>
   <a href="inventory.html" class="btn btn-success">View Inventory</a>
@@ -232,6 +227,5 @@ loadHistory();
   <button class="btn btn-info me-2" onclick="monthlySummary()">Monthly Summary</button>
   <button class="btn btn-warning" onclick="exportExcel()">Export Excel</button>
 </div>
-
 </body>
 </html>
