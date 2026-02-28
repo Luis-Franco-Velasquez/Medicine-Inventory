@@ -5,6 +5,19 @@
 <title>Medical Mission System</title>
 <!-- Bootstrap CSS -->
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+
+<style>
+/* Flashing LOW STOCK badge */
+@keyframes flash {
+  0%, 50%, 100% { opacity: 1; }
+  25%, 75% { opacity: 0; }
+}
+.low-stock-badge {
+  animation: flash 1s infinite;
+  font-weight: bold;
+}
+</style>
+
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import {
@@ -56,6 +69,18 @@ async function loadMedicines(type) {
   });
 }
 
+/* Toggle barangay textbox */
+function toggleBarangayTextbox() {
+  const select = document.getElementById("barangaySelect");
+  const textbox = document.getElementById("barangayTextbox");
+  if (select.value === "Other") {
+    textbox.style.display = "block";
+  } else {
+    textbox.style.display = "none";
+    textbox.value = "";
+  }
+}
+
 /* Auto-fill price on medicine select */
 document.addEventListener("change", async (e) => {
   if (e.target.id === "medicine") {
@@ -81,19 +106,29 @@ window.computeTotal = computeTotal;
 window.addRecord = async function() {
   const patientName = document.getElementById("patientName").value;
   const date = document.getElementById("date").value;
-  const barangay = document.getElementById("barangay").value;
+  const selectedBarangay = document.getElementById("barangaySelect").value;
+  const barangay = selectedBarangay === "Other" 
+    ? document.getElementById("barangayTextbox").value 
+    : selectedBarangay;
   const medicineId = document.getElementById("medicine").value;
   const quantity = parseInt(document.getElementById("quantity").value);
   const price = parseFloat(document.getElementById("price").value);
   const amount = parseFloat(document.getElementById("amount").value);
+  const medType = document.getElementById("medicineType").value;
 
-  if (!medicineId || !currentCollection) { alert("Select medicine type & medicine"); return; }
+  if (!patientName || !date || !barangay || !medicineId || !medType) {
+    alert("Please fill all required fields!");
+    return;
+  }
 
   const ref = doc(db, currentCollection, medicineId);
   const snap = await getDoc(ref);
   const med = snap.data();
 
-  if (quantity <= 0 || quantity > med.qty) { alert("Invalid quantity or insufficient stock!"); return; }
+  if (quantity <= 0 || quantity > med.qty) {
+    alert("Invalid quantity or insufficient stock!");
+    return;
+  }
 
   // Deduct stock
   await updateDoc(ref, { qty: med.qty - quantity });
@@ -103,7 +138,7 @@ window.addRecord = async function() {
     patientName,
     date,
     barangay,
-    medicineType: document.getElementById("medicineType").value,
+    medicineType: medType,
     medicine: med.name,
     mg: med.mg,
     quantity,
@@ -184,7 +219,36 @@ loadHistory();
   <div class="row g-2">
     <div class="col-md-3"><input type="text" class="form-control" id="patientName" placeholder="Patient Name"></div>
     <div class="col-md-2"><input type="date" class="form-control" id="date"></div>
-    <div class="col-md-2"><input type="text" class="form-control" id="barangay" placeholder="Barangay"></div>
+    <div class="col-md-2">
+      <select class="form-select" id="barangaySelect" onchange="toggleBarangayTextbox()">
+        <option value="">Select Barangay</option>
+        <option>Aduas Centro</option>
+        <option>Aduas Norte</option>
+        <option>Aduas Sur</option>
+        <option>Barrera</option>
+        <option>Cantarilla</option>
+        <option>Cruz Roja</option>
+        <option>Daan Sarile</option>
+        <option>Dimasalang</option>
+        <option>D.S. Garcia</option>
+        <option>Gen. Luna</option>
+        <option>Imelda</option>
+        <option>Isla</option>
+        <option>M.S. Garcia</option>
+        <option>Nabao</option>
+        <option>Obrero</option>
+        <option>Pagas</option>
+        <option>Pag-Asa</option>
+        <option>San Juan Acffa</option>
+        <option>San Roque Norte</option>
+        <option>San Roque Sur</option>
+        <option>Sanbermicristi</option>
+        <option>Sumacab Este</option>
+        <option>Valdefuente</option>
+        <option>Other</option>
+      </select>
+      <input type="text" class="form-control mt-1" id="barangayTextbox" placeholder="Enter Barangay" style="display:none;">
+    </div>
     <div class="col-md-2">
       <select class="form-select" id="medicineType" onchange="loadMedicines(this.value)">
         <option value="">Select Type</option>
@@ -199,7 +263,7 @@ loadHistory();
   <div class="row g-2 mt-2">
     <div class="col-md-1"><input type="number" class="form-control" id="quantity" placeholder="Qty" oninput="computeTotal()"></div>
     <div class="col-md-2"><input type="number" class="form-control" id="price" placeholder="Price" step="0.01" oninput="computeTotal()"></div>
-    <div class="col-md-2"><input type="number" class="form-control" id="amount" placeholder="Total" step="0.01"></div>
+    <div class="col-md-2"><input type="number" class="form-control" id="amount" placeholder="Total" step="0.01" readonly></div>
     <div class="col-md-2"><button class="btn btn-primary w-100" onclick="addRecord()">Save</button></div>
   </div>
 </div>
