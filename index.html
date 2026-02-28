@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Medicine Inventory System</title>
+
+<style>
+body { font-family: Arial; padding:20px; }
+h1,h2 { margin-top:30px; }
+
+table { width:100%; border-collapse: collapse; margin-top:10px; }
+th,td { border:1px solid #ccc; padding:8px; text-align:center; }
+th { background:#f2f2f2; }
+
+input,select,button { padding:6px; margin:4px; }
+
+.dashboard {
+    display:flex;
+    gap:30px;
+    margin-bottom:20px;
+}
+
+.card {
+    border:1px solid #ccc;
+    padding:15px;
+    width:220px;
+}
+
+.low-stock { background:#ffe5e5; }
+
+.badge {
+    background:red;
+    color:white;
+    padding:3px 6px;
+    font-size:11px;
+    border-radius:4px;
+    margin-left:5px;
+    animation:blink 1s infinite;
+}
+
+@keyframes blink {
+    0% {opacity:1;}
+    50% {opacity:0.3;}
+    100% {opacity:1;}
+}
+</style>
+</head>
+
+<body>
+
+<h1>Medicine Inventory System</h1>
+
+<!-- DASHBOARD -->
+<h2>Dashboard Summary</h2>
+<div class="dashboard">
+    <div class="card">
+        <h3>Total Adult Medicines</h3>
+        <h2 id="totalAdult">0</h2>
+    </div>
+    <div class="card">
+        <h3>Total Adult Stock Value</h3>
+        ₱ <h2 id="totalAdultValue">0.00</h2>
+    </div>
+    <div class="card">
+        <h3>Total Pedia Medicines</h3>
+        <h2 id="totalPedia">0</h2>
+    </div>
+</div>
+
+<!-- ================= ADULT ================= -->
+<h2>Adult Medicine</h2>
+
+<form id="adultForm">
+<input type="text" id="adultName" placeholder="Medicine Name" required>
+<input type="number" id="adultMg" placeholder="Milligram" required>
+<select id="adultType">
+<option>Tablet</option>
+<option>Capsule</option>
+</select>
+<input type="number" id="adultPrice" placeholder="Price" required>
+<input type="number" id="adultQty" placeholder="Quantity" required>
+<button type="submit">Add</button>
+</form>
+
+<input type="text" id="adultSearch" placeholder="Search">
+<button onclick="searchAdult()">Search</button>
+<button onclick="exportAdult()">Export Excel</button>
+
+<table>
+<thead>
+<tr>
+<th>Name</th>
+<th>Milligram</th>
+<th>Price</th>
+<th>Stock</th>
+<th>Dispense</th>
+</tr>
+</thead>
+<tbody id="adultTable"></tbody>
+</table>
+
+<!-- HISTORY -->
+<h2>Dispensing History</h2>
+<table>
+<thead>
+<tr>
+<th>Date</th>
+<th>Medicine</th>
+<th>Milligram</th>
+<th>Dispensed</th>
+<th>Remaining</th>
+</tr>
+</thead>
+<tbody id="historyTable"></tbody>
+</table>
+
+<!-- ================= PEDIA ================= -->
+<h2>Pedia Medicine</h2>
+
+<form id="pediaForm">
+<input type="text" id="pediaName" placeholder="Medicine Name" required>
+<input type="number" id="pediaMg" placeholder="Milligram" required>
+<select id="pediaUnit">
+<option>mg</option>
+<option>ml</option>
+</select>
+<select id="pediaType">
+<option>Pieces</option>
+<option>Bottle</option>
+</select>
+<button type="submit">Add</button>
+</form>
+
+<input type="text" id="pediaSearch" placeholder="Search">
+<button onclick="searchPedia()">Search</button>
+<button onclick="exportPedia()">Export Excel</button>
+
+<table>
+<thead>
+<tr>
+<th>Name</th>
+<th>Milligram</th>
+<th>Type</th>
+</tr>
+</thead>
+<tbody id="pediaTable"></tbody>
+</table>
+
+<script type="module">
+
+import { initializeApp } from "https://www.gstatic.com/firebasejs/12.10.0/firebase-app.js";
+import { getDatabase, ref, push, onValue, update } from "https://www.gstatic.com/firebasejs/12.10.0/firebase-database.js";
+
+/* ===== FIREBASE CONFIG ===== */
+const firebaseConfig = {
+  apiKey: "AIzaSyDkuo0jjGYIBC1MKOWD42XvcB4nWy_72qQ",
+  authDomain: "medicine-inventory-cc500.firebaseapp.com",
+  databaseURL: "https://medicine-inventory-cc500-default-rtdb.firebaseio.com/",
+  projectId: "medicine-inventory-cc500",
+  storageBucket: "medicine-inventory-cc500.firebasestorage.app",
+  messagingSenderId: "1044916941588",
+  appId: "1:1044916941588:web:ef2a8ee26f23b24d07c801"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getDatabase(app);
+
+let adultData = {};
+let pediaData = {};
+let totalAdultValue = 0;
+let totalAdultCount = 0;
+let totalPediaCount = 0;
+
+/* ================= ADULT ================= */
+
+adultForm.addEventListener("submit", e => {
+    e.preventDefault();
+    push(ref(db,"adult_medicine"),{
+        name: adultName.value,
+        mg: adultMg.value+" mg "+adultType.value,
+        price: adultPrice.value,
+        qty: adultQty.value
+    });
+    adultForm.reset();
+});
+
+onValue(ref(db,"adult_medicine"), snapshot=>{
+    adultTable.innerHTML="";
+    adultData={};
+    totalAdultValue=0;
+    totalAdultCount=0;
+
+    snapshot.forEach(child=>{
+        adultData[child.key]=child.val();
+        totalAdultCount++;
+        totalAdultValue += parseFloat(child.val().price)*parseInt(child.val().qty);
+        renderAdult(child.key,child.val());
+    });
+
+    updateDashboard();
+});
+
+function renderAdult(key,data){
+    const low=parseInt(data.qty)<10;
+    adultTable.innerHTML+=`
+    <tr class="${low?'low-stock':''}">
+    <td>${data.name} ${low?'<span class="badge">LOW STOCK</span>':''}</td>
+    <td>${data.mg}</td>
+    <td><input type="number" value="${data.price}" onchange="updatePrice('${key}',this.value)"></td>
+    <td>${data.qty}</td>
+    <td>
+    <input type="number" min="1" placeholder="Qty">
+    <button onclick="deductStock('${key}',this)">Dispense</button>
+    </td>
+    </tr>`;
+}
+
+window.updatePrice=(key,val)=>{
+    update(ref(db,"adult_medicine/"+key),{price:val});
+};
+
+window.deductStock=(key,btn)=>{
+    const qty=parseInt(btn.previousElementSibling.value);
+    const current=parseInt(adultData[key].qty);
+    if(!qty||qty<=0||qty>current){alert("Invalid quantity");return;}
+    const newQty=current-qty;
+    update(ref(db,"adult_medicine/"+key),{qty:newQty});
+    push(ref(db,"dispense_logs"),{
+        medicine:adultData[key].name,
+        milligram:adultData[key].mg,
+        quantity_dispensed:qty,
+        remaining_stock:newQty,
+        date:new Date().toLocaleString()
+    });
+    btn.previousElementSibling.value="";
+};
+
+window.searchAdult=()=>{
+    const s=adultSearch.value.toLowerCase();
+    adultTable.innerHTML="";
+    Object.keys(adultData).forEach(k=>{
+        if(adultData[k].name.toLowerCase().includes(s)){
+            renderAdult(k,adultData[k]);
+        }
+    });
+};
+
+window.exportAdult=()=>{
+    let csv="Medicine,Milligram,Price,Quantity\n";
+    Object.values(adultData).forEach(d=>{
+        csv+=`${d.name},${d.mg},${d.price},${d.qty}\n`;
+    });
+    download(csv,"adult_inventory.csv");
+};
+
+/* ================= HISTORY ================= */
+
+onValue(ref(db,"dispense_logs"), snapshot=>{
+    historyTable.innerHTML="";
+    snapshot.forEach(child=>{
+        const d=child.val();
+        historyTable.innerHTML+=`
+        <tr>
+        <td>${d.date}</td>
+        <td>${d.medicine}</td>
+        <td>${d.milligram}</td>
+        <td>${d.quantity_dispensed}</td>
+        <td>${d.remaining_stock}</td>
+        </tr>`;
+    });
+});
+
+/* ================= PEDIA ================= */
+
+pediaForm.addEventListener("submit",e=>{
+    e.preventDefault();
+    push(ref(db,"pedia_medicine"),{
+        name:pediaName.value,
+        mg:pediaMg.value+" "+pediaUnit.value,
+        type:pediaType.value
+    });
+    pediaForm.reset();
+});
+
+onValue(ref(db,"pedia_medicine"), snapshot=>{
+    pediaTable.innerHTML="";
+    pediaData={};
+    totalPediaCount=0;
+    snapshot.forEach(child=>{
+        pediaData[child.key]=child.val();
+        totalPediaCount++;
+        renderPedia(child.val());
+    });
+    updateDashboard();
+});
+
+function renderPedia(data){
+    pediaTable.innerHTML+=`
+    <tr>
+    <td>${data.name}</td>
+    <td>${data.mg}</td>
+    <td>${data.type}</td>
+    </tr>`;
+}
+
+window.searchPedia=()=>{
+    const s=pediaSearch.value.toLowerCase();
+    pediaTable.innerHTML="";
+    Object.values(pediaData).forEach(d=>{
+        if(d.name.toLowerCase().includes(s)){
+            renderPedia(d);
+        }
+    });
+};
+
+window.exportPedia=()=>{
+    let csv="Medicine,Milligram,Type\n";
+    Object.values(pediaData).forEach(d=>{
+        csv+=`${d.name},${d.mg},${d.type}\n`;
+    });
+    download(csv,"pedia_inventory.csv");
+};
+
+/* ================= DASHBOARD ================= */
+
+function updateDashboard(){
+    totalAdult.innerText=totalAdultCount;
+    totalAdultValue.innerText=totalAdultValue.toFixed(2);
+    totalPedia.innerText=totalPediaCount;
+}
+
+/* ================= AUTO DAILY BACKUP ================= */
+
+function autoBackup(){
+    const today=new Date().toDateString();
+    if(localStorage.getItem("backupDate")!==today){
+        exportAdult();
+        exportPedia();
+        localStorage.setItem("backupDate",today);
+    }
+}
+setTimeout(autoBackup,3000);
+
+/* ================= DOWNLOAD ================= */
+
+function download(content,filename){
+    const blob=new Blob([content],{type:"text/csv"});
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement("a");
+    a.href=url;
+    a.download=filename;
+    a.click();
+}
+
+</script>
+</body>
+</html>
