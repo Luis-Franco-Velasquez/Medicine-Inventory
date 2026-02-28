@@ -1,319 +1,274 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
 <meta charset="UTF-8">
-<title>Medicine Inventory System - Firestore</title>
-<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
-<script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
-<style>
-.badge-lowstock { 
-  background:red; color:white; padding:3px 6px; border-radius:4px; 
-  animation: blink 1s infinite;
-}
-@keyframes blink {0%{opacity:1;}50%{opacity:0.3;}100%{opacity:1;}}
-.low-stock { background:#ffe5e5; }
-</style>
-</head>
-<body class="bg-light">
-
-<div class="container my-4">
-  <h1 class="text-center mb-4">Pondong Pastoral Medicine Inventory System</h1>
-
-  <!-- DASHBOARD -->
-  <div class="row mb-4">
-    <div class="col-md-3"><div class="card text-center shadow"><div class="card-body"><h5>Total Adult Medicines</h5><h2 id="totalAdult">0</h2></div></div></div>
-    <div class="col-md-3"><div class="card text-center shadow"><div class="card-body"><h5>Total Adult Stock Value</h5><h2 id="totalAdultValue">₱0.00</h2></div></div></div>
-    <div class="col-md-3"><div class="card text-center shadow"><div class="card-body"><h5>Total Pediatric Medicines</h5><h2 id="totalPedia">0</h2></div></div></div>
-    <div class="col-md-3"><div class="card text-center shadow"><div class="card-body"><h5>Total Pediatric Stock Value</h5><h2 id="totalPediaValue">₱0.00</h2></div></div></div>
-  </div>
-
-  <!-- ADULT MEDICINE FORM -->
-  <div class="card mb-4 shadow">
-    <div class="card-header bg-primary text-white">Adult Medicine Form</div>
-    <div class="card-body">
-      <form id="adultForm" class="row g-3">
-        <div class="col-md-3"><input type="text" class="form-control" id="adultName" placeholder="Medicine Name" required></div>
-        <div class="col-md-3"><input type="text" class="form-control" id="adultMg" placeholder="Milligram (e.g., 250 mg + 125 mg)" required></div>
-        <div class="col-md-2"><select class="form-select" id="adultType"><option>Tablet</option><option>Capsule</option></select></div>
-        <div class="col-md-2"><input type="number" step="0.01" class="form-control" id="adultPrice" placeholder="Price" required></div>
-        <div class="col-md-2"><input type="number" class="form-control" id="adultQty" placeholder="Quantity" required></div>
-        <div class="col-md-12 mt-2"><button type="submit" class="btn btn-success w-100">Add</button></div>
-      </form>
-
-      <div class="d-flex justify-content-between my-2">
-        <input type="text" class="form-control w-50" id="adultSearch" placeholder="Search Adult Medicines...">
-        <button class="btn btn-outline-success" id="exportAdult">Export Adult Excel</button>
-      </div>
-
-      <table class="table table-bordered table-hover mt-3">
-        <thead class="table-light"><tr><th>Name</th><th>Milligram</th><th>Price</th><th>Stock</th><th>Actions</th></tr></thead>
-        <tbody id="adultTable"></tbody>
-      </table>
-    </div>
-  </div>
-
-  <!-- PEDIATRIC MEDICINE FORM -->
-  <div class="card mb-4 shadow">
-    <div class="card-header bg-success text-white">Pediatric Medicine Fill-Up</div>
-    <div class="card-body">
-      <form id="pediaForm" class="row g-3">
-        <div class="col-md-3"><input type="text" class="form-control" id="pediaName" placeholder="Medicine Name" required></div>
-        <div class="col-md-2"><input type="text" class="form-control" id="pediaMg" placeholder="Milligram/ml (e.g., 125 mg + 50 mg)" required></div>
-        <div class="col-md-2"><select class="form-select" id="pediaUnit"><option>mg</option><option>ml</option></select></div>
-        <div class="col-md-2"><select class="form-select" id="pediaType"><option>Pieces</option><option>Bottle</option></select></div>
-        <div class="col-md-2"><input type="number" step="0.01" class="form-control" id="pediaPrice" placeholder="Price" min="0" required></div>
-        <div class="col-md-1"><input type="number" class="form-control" id="pediaQty" placeholder="Qty" min="1" value="1"></div>
-        <div class="col-md-2"><input type="text" class="form-control fw-bold text-success" id="pediaTotal" placeholder="Total" readonly></div>
-        <div class="col-md-12 mt-2"><button type="submit" class="btn btn-success w-100">Add</button></div>
-      </form>
-
-      <div class="d-flex justify-content-between my-2">
-        <input type="text" class="form-control w-50" id="pediaSearch" placeholder="Search Pediatric Medicines...">
-        <button class="btn btn-outline-success" id="exportPedia">Export Pediatric Excel</button>
-      </div>
-
-      <table class="table table-bordered table-hover mt-3">
-        <thead class="table-light"><tr><th>Name</th><th>Milligram/ml</th><th>Type</th><th>Price</th><th>Quantity</th><th>Total</th><th>Actions</th></tr></thead>
-        <tbody id="pediaTable"></tbody>
-      </table>
-    </div>
-  </div>
-
-  <!-- DISPENSING HISTORY -->
-  <div class="card mb-4 shadow">
-    <div class="card-header bg-dark text-white">Dispensing History</div>
-    <div class="card-body table-responsive">
-      <table class="table table-bordered table-hover">
-        <thead class="table-light"><tr><th>Date</th><th>Medicine</th><th>Milligram/ml</th><th>Quantity Dispensed</th><th>Remaining Stock</th></tr></thead>
-        <tbody id="historyTable"></tbody>
-      </table>
-    </div>
-  </div>
-</div>
+<title>Medical Mission System</title>
 
 <script type="module">
-import { initializeApp } from "https://www.gstatic.com/firebasejs/12.10.0/firebase-app.js";
-import { getFirestore, collection, addDoc, onSnapshot, doc, updateDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/12.10.0/firebase-firestore.js";
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import {
+  getFirestore,
+  collection,
+  addDoc,
+  getDocs,
+  doc,
+  updateDoc,
+  getDoc,
+  query,
+  where
+} from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+import * as XLSX from "https://cdn.jsdelivr.net/npm/xlsx@0.18.5/+esm";
 
 const firebaseConfig = {
   apiKey: "AIzaSyDkuo0jjGYIBC1MKOWD42XvcB4nWy_72qQ",
   authDomain: "medicine-inventory-cc500.firebaseapp.com",
+  databaseURL: "https://medicine-inventory-cc500-default-rtdb.asia-southeast1.firebasedatabase.app",
   projectId: "medicine-inventory-cc500",
-  storageBucket: "medicine-inventory-cc500.appspot.com",
+  storageBucket: "medicine-inventory-cc500.firebasestorage.app",
   messagingSenderId: "1044916941588",
   appId: "1:1044916941588:web:ef2a8ee26f23b24d07c801",
   measurementId: "G-BB4NQX65NN"
 };
+
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
-let adultData={}, pediaData={};
+let currentCollection = "";
 
-// --- DASHBOARD UPDATE FUNCTION ---
-function updateDashboard(){
-  let totalAdultCount = Object.keys(adultData).length;
-  let totalAdultValue = Object.values(adultData).reduce((sum,d)=>sum + parseFloat(d.price)*parseFloat(d.qty),0);
-  let totalPediaCount = Object.keys(pediaData).length;
-  let totalPediaValue = Object.values(pediaData).reduce((sum,d)=>sum + parseFloat(d.total),0);
+/* =========================
+   LOAD MEDICINES
+========================= */
+async function loadMedicines(type) {
+  currentCollection = type === "Adult"
+    ? "adult_medicines"
+    : "pedia_medicines";
 
-  document.getElementById("totalAdult").innerText = totalAdultCount;
-  document.getElementById("totalAdultValue").innerText = "₱"+totalAdultValue.toFixed(2);
-  document.getElementById("totalPedia").innerText = totalPediaCount;
-  document.getElementById("totalPediaValue").innerText = "₱"+totalPediaValue.toFixed(2);
+  const dropdown = document.getElementById("medicine");
+  dropdown.innerHTML = `<option value="">Select Medicine</option>`;
+
+  const snapshot = await getDocs(collection(db, currentCollection));
+
+  snapshot.forEach(docSnap => {
+    const data = docSnap.data();
+    const option = document.createElement("option");
+    option.value = docSnap.id;
+
+    if (data.qty < 10) {
+      option.textContent = `⚠ ${data.name} - ${data.mg} (LOW: ${data.qty})`;
+      option.style.color = "red";
+    } else {
+      option.textContent = `${data.name} - ${data.mg} (Stock: ${data.qty})`;
+    }
+
+    dropdown.appendChild(option);
+  });
 }
 
-// --- ADULT FORM ---
-document.getElementById("adultForm").addEventListener("submit", async e=>{
-  e.preventDefault();
-  const name=document.getElementById("adultName").value.trim();
-  const mg=document.getElementById("adultMg").value.trim();
-  const type=document.getElementById("adultType").value;
-  const price=parseFloat(document.getElementById("adultPrice").value);
-  const qty=parseFloat(document.getElementById("adultQty").value);
+/* =========================
+   AUTO FILL PRICE
+========================= */
+document.addEventListener("change", async (e) => {
+  if (e.target.id === "medicine") {
+    const id = e.target.value;
+    if (!id) return;
 
-  const exists = Object.values(adultData).some(d=>d.name===name && d.mg===mg+" / "+type);
-  if(exists){alert("Already exists!"); return;}
+    const ref = doc(db, currentCollection, id);
+    const snap = await getDoc(ref);
+    const data = snap.data();
 
-  await addDoc(collection(db,"adult_medicine"),{name, mg: mg+" / "+type, price, qty});
-  document.getElementById("adultForm").reset();
-});
-
-// --- PEDIATRIC FORM ---
-function calculatePediaTotal(){ 
-  const price=parseFloat(document.getElementById("pediaPrice").value||0);
-  const qty=parseFloat(document.getElementById("pediaQty").value||0);
-  document.getElementById("pediaTotal").value = (price*qty).toFixed(2);
-}
-document.getElementById("pediaPrice").addEventListener("input", calculatePediaTotal);
-document.getElementById("pediaQty").addEventListener("input", calculatePediaTotal);
-
-document.getElementById("pediaForm").addEventListener("submit", async e=>{
-  e.preventDefault();
-  const name=document.getElementById("pediaName").value.trim();
-  const mg=document.getElementById("pediaMg").value.trim();
-  const unit=document.getElementById("pediaUnit").value;
-  const type=document.getElementById("pediaType").value;
-  const price=parseFloat(document.getElementById("pediaPrice").value);
-  const qty=parseFloat(document.getElementById("pediaQty").value);
-  const total=(price*qty).toFixed(2);
-
-  const exists = Object.values(pediaData).some(d=>d.name===name && d.mg===mg+" "+unit);
-  if(exists){alert("Already exists!"); return;}
-
-  await addDoc(collection(db,"pedia_medicine"),{name, mg: mg+" "+unit, type, price, qty, total});
-  document.getElementById("pediaForm").reset();
-  document.getElementById("pediaTotal").value = "";
-});
-
-// --- REALTIME SNAPSHOTS ---
-onSnapshot(collection(db,"adult_medicine"), snapshot=>{
-  const adultTable=document.getElementById("adultTable"); adultTable.innerHTML=""; adultData={};
-  snapshot.forEach(docSnap=>{
-    const d=docSnap.data(); adultData[docSnap.id]=d;
-    const low=d.qty<10;
-    adultTable.innerHTML+=`
-      <tr class="${low?'low-stock':''}">
-        <td>${d.name} ${low?'<span class="badge-lowstock">LOW STOCK</span>':''}</td>
-        <td>${d.mg}</td>
-        <td><input type="number" step="0.01" class="form-control form-control-sm" value="${d.price}" onchange="updatePrice('adult','${docSnap.id}',this.value)"></td>
-        <td><input type="number" step="0.01" class="form-control form-control-sm" value="${d.qty}" onchange="updateStock('adult','${docSnap.id}',this.value)"></td>
-        <td>
-          <button class="btn btn-sm btn-primary" onclick="deductStock('adult','${docSnap.id}')">Dispense</button>
-          <button class="btn btn-sm btn-danger" onclick="deleteItem('adult','${docSnap.id}')">Delete</button>
-        </td>
-      </tr>`;
-  });
-  updateDashboard();
-});
-
-onSnapshot(collection(db,"pedia_medicine"), snapshot=>{
-  const pediaTable=document.getElementById("pediaTable"); pediaTable.innerHTML=""; pediaData={};
-  snapshot.forEach(docSnap=>{
-    const d=docSnap.data(); pediaData[docSnap.id]=d;
-    const low=d.qty<10;
-    pediaTable.innerHTML+=`
-      <tr class="${low?'low-stock':''}">
-        <td>${d.name} ${low?'<span class="badge-lowstock">LOW STOCK</span>':''}</td>
-        <td>${d.mg}</td>
-        <td>${d.type}</td>
-        <td><input type="number" step="0.01" class="form-control form-control-sm" value="${d.price}" onchange="updatePrice('pedia','${docSnap.id}',this.value)"></td>
-        <td><input type="number" step="0.01" class="form-control form-control-sm" value="${d.qty}" onchange="updateStock('pedia','${docSnap.id}',this.value)"></td>
-        <td>${d.total}</td>
-        <td><button class="btn btn-sm btn-danger" onclick="deleteItem('pedia','${docSnap.id}')">Delete</button></td>
-      </tr>`;
-  });
-  updateDashboard();
-});
-
-// --- FUNCTIONS: Update, Delete, Deduct Stock ---
-window.updatePrice = async (type,id,value)=>{
-  const ref=doc(db, type==="adult"?"adult_medicine":"pedia_medicine", id);
-  const newVal=parseFloat(value)||0;
-  if(type==="pedia"){
-    const d=pediaData[id]; const total=(d.qty*newVal).toFixed(2);
-    await updateDoc(ref,{price:newVal,total});
-  }else await updateDoc(ref,{price:newVal});
-};
-
-window.updateStock = async (type,id,value)=>{
-  const ref=doc(db, type==="adult"?"adult_medicine":"pedia_medicine", id);
-  const newVal=parseFloat(value)||0;
-  if(type==="pedia"){
-    const d=pediaData[id]; const total=(d.price*newVal).toFixed(2);
-    await updateDoc(ref,{qty:newVal,total});
-  } else await updateDoc(ref,{qty:newVal});
-};
-
-window.deleteItem = async (type,id)=>{
-  if(confirm("Delete this item?")){
-    await deleteDoc(doc(db,type==="adult"?"adult_medicine":"pedia_medicine",id));
+    document.getElementById("price").value = data.price;
+    computeTotal();
   }
+});
+
+/* =========================
+   COMPUTE TOTAL
+========================= */
+function computeTotal() {
+  const qty = parseFloat(document.getElementById("quantity").value) || 0;
+  const price = parseFloat(document.getElementById("price").value) || 0;
+  document.getElementById("amount").value = (qty * price).toFixed(2);
+}
+
+window.computeTotal = computeTotal;
+
+/* =========================
+   ADD RECORD
+========================= */
+window.addRecord = async function() {
+
+  const patientName = document.getElementById("patientName").value;
+  const date = document.getElementById("date").value;
+  const barangay = document.getElementById("barangay").value;
+  const medicineId = document.getElementById("medicine").value;
+  const quantity = parseInt(document.getElementById("quantity").value);
+  const price = parseFloat(document.getElementById("price").value);
+  const amount = parseFloat(document.getElementById("amount").value);
+
+  if (!medicineId || !currentCollection) {
+    alert("Select medicine type & medicine");
+    return;
+  }
+
+  const ref = doc(db, currentCollection, medicineId);
+  const snap = await getDoc(ref);
+  const med = snap.data();
+
+  if (quantity <= 0 || quantity > med.qty) {
+    alert("Invalid quantity or insufficient stock!");
+    return;
+  }
+
+  // Deduct stock safely
+  await updateDoc(ref, {
+    qty: med.qty - quantity
+  });
+
+  // Save record with price at time
+  await addDoc(collection(db, "medical_records"), {
+    patientName,
+    date,
+    barangay,
+    medicineType: document.getElementById("medicineType").value,
+    medicine: med.name,
+    mg: med.mg,
+    quantity,
+    price_at_time: price,
+    total: amount
+  });
+
+  alert("Record Saved!");
+  loadHistory();
 };
 
+/* =========================
+   LOAD PATIENT HISTORY
+========================= */
+async function loadHistory() {
+  const snapshot = await getDocs(collection(db, "medical_records"));
+  const table = document.getElementById("history");
+  table.innerHTML = "";
 
+  snapshot.forEach(docSnap => {
+    const d = docSnap.data();
 
-
-
-
-// --- DISPENSE STOCK ---
-window.deductStock = async (id)=>{
-  const ref = doc(db, "adult_medicine", id);
-  const d = adultData[id];
-  const qty = parseFloat(prompt(`Dispense how many of "${d.name}"?`, 1));
-  if(!qty || qty <=0) return;
-  const remaining = d.qty - qty;
-  if(remaining < 0) { alert("Not enough stock!"); return; }
-
-  await updateDoc(ref, { qty: remaining });
-
-  // Add to history
-  const date = new Date().toLocaleString();
-  const historyRef = collection(db, "dispensing_history");
-  await addDoc(historyRef, { date, medicine: d.name, mg: d.mg, qtyDispensed: qty, remainingStock: remaining });
-};
-
-// --- HISTORY SNAPSHOT ---
-onSnapshot(collection(db, "dispensing_history"), snapshot=>{
-  const historyTable = document.getElementById("historyTable"); historyTable.innerHTML="";
-  snapshot.forEach(docSnap=>{
-    const h = docSnap.data();
-    historyTable.innerHTML+=`
+    table.innerHTML += `
       <tr>
-        <td>${h.date}</td>
-        <td>${h.medicine}</td>
-        <td>${h.mg}</td>
-        <td>${h.qtyDispensed}</td>
-        <td>${h.remainingStock}</td>
-      </tr>`;
+        <td>${d.date}</td>
+        <td>${d.patientName}</td>
+        <td>${d.barangay}</td>
+        <td>${d.medicineType}</td>
+        <td>${d.medicine}</td>
+        <td>${d.quantity}</td>
+        <td>${d.total}</td>
+        <td><button onclick="viewPatient('${d.patientName}')">View</button></td>
+      </tr>
+    `;
   });
-});
+}
 
-// --- SEARCH FUNCTION ---
-document.getElementById("adultSearch").addEventListener("input", e=>{
-  const term = e.target.value.toLowerCase();
-  Array.from(document.getElementById("adultTable").rows).forEach(r=>{
-    r.style.display = r.cells[0].innerText.toLowerCase().includes(term) || 
-                      r.cells[1].innerText.toLowerCase().includes(term) ? "" : "none";
+window.viewPatient = async function(name) {
+  const q = query(collection(db,"medical_records"),where("patientName","==",name));
+  const snapshot = await getDocs(q);
+  let msg = "Patient History:\n\n";
+  snapshot.forEach(doc=> {
+    const d = doc.data();
+    msg += `${d.date} - ${d.medicine} (${d.quantity})\n`;
   });
-});
+  alert(msg);
+};
 
-document.getElementById("pediaSearch").addEventListener("input", e=>{
-  const term = e.target.value.toLowerCase();
-  Array.from(document.getElementById("pediaTable").rows).forEach(r=>{
-    r.style.display = r.cells[0].innerText.toLowerCase().includes(term) || 
-                      r.cells[1].innerText.toLowerCase().includes(term) ? "" : "none";
+/* =========================
+   MONTHLY SUMMARY
+========================= */
+window.monthlySummary = async function() {
+  const snapshot = await getDocs(collection(db,"medical_records"));
+  const summary = {};
+
+  snapshot.forEach(doc=>{
+    const d = doc.data();
+    const month = d.date.substring(0,7);
+    if(!summary[month]) summary[month] = {};
+    if(!summary[month][d.barangay]) summary[month][d.barangay] = 0;
+    summary[month][d.barangay] += d.total;
   });
-});
 
-// --- EXPORT TO EXCEL ---
-function exportTableToExcel(tableId, filename){
+  console.log(summary);
+  alert("Check console for summary.");
+};
+
+/* =========================
+   EXPORT EXCEL
+========================= */
+window.exportExcel = async function() {
+  const snapshot = await getDocs(collection(db,"medical_records"));
+  const data = [];
+
+  snapshot.forEach(doc=>{
+    data.push(doc.data());
+  });
+
+  const ws = XLSX.utils.json_to_sheet(data);
   const wb = XLSX.utils.book_new();
-  const ws = XLSX.utils.table_to_sheet(document.getElementById(tableId));
-  XLSX.utils.book_append_sheet(wb, ws, "Sheet1");
-  XLSX.writeFile(wb, filename);
-}
+  XLSX.utils.book_append_sheet(wb, ws, "Records");
+  XLSX.writeFile(wb,"Medical_Report.xlsx");
+};
 
-document.getElementById("exportAdult").addEventListener("click", ()=>exportTableToExcel("adultTable","Adult_Medicines.xlsx"));
-document.getElementById("exportPedia").addEventListener("click", ()=>exportTableToExcel("pediaTable","Pediatric_Medicines.xlsx"));
-
-// --- AUTO DAILY BACKUP ---
-async function dailyBackup(){
-  const today = new Date().toISOString().split("T")[0];
-  // Create snapshot of adult_medicine
-  const adultSnap = await getDocs(collection(db, "adult_medicine"));
-  const adultDataBackup = adultSnap.docs.map(d=>d.data());
-  const blobAdult = new Blob([JSON.stringify(adultDataBackup,null,2)], {type:"application/json"});
-  const aAdult = document.createElement("a"); aAdult.href=URL.createObjectURL(blobAdult); aAdult.download=`Adult_Medicines_Backup_${today}.json`; aAdult.click();
-
-  // Pediatric
-  const pediaSnap = await getDocs(collection(db, "pedia_medicine"));
-  const pediaDataBackup = pediaSnap.docs.map(d=>d.data());
-  const blobPedia = new Blob([JSON.stringify(pediaDataBackup,null,2)], {type:"application/json"});
-  const aPedia = document.createElement("a"); aPedia.href=URL.createObjectURL(blobPedia); aPedia.download=`Pediatric_Medicines_Backup_${today}.json`; aPedia.click();
-}
-
-// Trigger backup once a day (simple example, triggers on page load)
-dailyBackup();
+loadHistory();
 </script>
+
+<style>
+body { font-family: Arial; padding:20px; background:#f4f6f9; }
+input,select,button { padding:6px; margin:5px; }
+table { width:100%; border-collapse:collapse; margin-top:20px; }
+th,td { border:1px solid #ccc; padding:8px; text-align:center; }
+th { background:#007bff; color:white; }
+</style>
+</head>
+
+<body>
+
+<h2>Medical Mission System</h2>
+
+<!-- PATIENT FORM -->
+<div>
+  <input type="text" id="patientName" placeholder="Patient Name">
+  <input type="date" id="date">
+  <input type="text" id="barangay" placeholder="Barangay">
+  <select id="medicineType" onchange="loadMedicines(this.value)">
+    <option value="">Select Type</option>
+    <option>Adult</option>
+    <option>Pedia</option>
+  </select>
+  <select id="medicine"></select>
+  <input type="number" id="quantity" placeholder="Qty" oninput="computeTotal()">
+  <input type="number" id="price" placeholder="Price" step="0.01" oninput="computeTotal()">
+  <input type="number" id="amount" placeholder="Total" step="0.01">
+  <button onclick="addRecord()">Save</button>
+</div>
+
+<!-- HISTORY -->
+<h3>Patient History</h3>
+<table>
+<thead>
+<tr>
+<th>Date</th>
+<th>Name</th>
+<th>Barangay</th>
+<th>Type</th>
+<th>Medicine</th>
+<th>Qty</th>
+<th>Total</th>
+<th>Action</th>
+</tr>
+</thead>
+<tbody id="history"></tbody>
+</table>
+
+<br>
+<button onclick="monthlySummary()">Monthly Summary</button>
+<button onclick="exportExcel()">Export Excel</button>
+
 </body>
 </html>
