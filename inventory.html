@@ -4,6 +4,19 @@
 <meta charset="UTF-8">
 <title>Medicine Inventory</title>
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+
+<style>
+/* Flashing LOW STOCK badge */
+@keyframes flash {
+  0%, 50%, 100% { opacity: 1; }
+  25%, 75% { opacity: 0; }
+}
+.low-stock-badge {
+  animation: flash 1s infinite;
+  font-weight: bold;
+}
+</style>
+
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getFirestore, collection, getDocs, doc, updateDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
@@ -22,7 +35,7 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
-/* Load medicines */
+/* Load table */
 async function loadTable(collectionName, tableId) {
   const snapshot = await getDocs(collection(db, collectionName));
   const table = document.getElementById(tableId);
@@ -30,11 +43,19 @@ async function loadTable(collectionName, tableId) {
   snapshot.forEach(docSnap => {
     const data = docSnap.data();
     const row = document.createElement("tr");
+
+    const lowStockBadge = data.qty < 10 
+      ? `<span class="badge bg-danger low-stock-badge">LOW STOCK</span>` 
+      : "";
+
     row.innerHTML = `
       <td><input type="text" class="form-control" value="${data.name}" id="name-${docSnap.id}"></td>
       <td><input type="text" class="form-control" value="${data.mg}" id="mg-${docSnap.id}"></td>
       <td><input type="number" class="form-control" step="0.01" value="${data.price}" id="price-${docSnap.id}"></td>
-      <td><input type="number" class="form-control" value="${data.qty}" id="qty-${docSnap.id}" style="${data.qty<10?'color:red;font-weight:bold;':''}"></td>
+      <td>
+        <input type="number" class="form-control" value="${data.qty}" id="qty-${docSnap.id}" style="${data.qty<10?'color:red;font-weight:bold;':''}">
+        ${lowStockBadge}
+      </td>
       <td><button class="btn btn-primary btn-sm w-100" onclick="updateMedicine('${collectionName}','${docSnap.id}')">Save</button></td>
     `;
     table.appendChild(row);
@@ -61,7 +82,10 @@ loadTable("pedia_medicine","pediaTable");
 </head>
 
 <body class="container py-4">
-<h1 class="mb-4">Medicine Inventory Management</h1>
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h1>Medicine Inventory Management</h1>
+  <a href="index.html" class="btn btn-secondary">Back to Patient Page</a>
+</div>
 
 <h2>Adult Medicines</h2>
 <div class="table-responsive mb-4">
