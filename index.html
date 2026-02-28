@@ -31,7 +31,6 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
-// Current collection: adult or pedia
 let currentCollection = "";
 
 // Medicine Type select
@@ -100,13 +99,15 @@ window.addRecord=async function(){
   const date=document.getElementById("date").value;
   const selectedBarangay=document.getElementById("barangaySelect").value;
   const barangay = selectedBarangay==="Other"?document.getElementById("barangayTextbox").value.trim():selectedBarangay;
+  const problem = document.getElementById("problem").value.trim();
+  const blockLeader = document.getElementById("blockLeader").value.trim();
   const medId=document.getElementById("medicineSearch").dataset.id;
   const qty=parseInt(document.getElementById("quantity").value);
   const price=parseFloat(document.getElementById("price").value);
   const total=parseFloat(document.getElementById("amount").value);
   const medType=document.getElementById("medicineType").value;
 
-  if(!patientName || !date || !barangay || !medId || !medType){
+  if(!patientName || !date || !barangay || !problem || !blockLeader || !medId || !medType){
     alert("Please fill all required fields!"); 
     return;
   }
@@ -132,6 +133,8 @@ window.addRecord=async function(){
     patientName,
     date,
     barangay,
+    problem,
+    blockLeader,
     medicineType:medType,
     medicine:medData.name,
     mg:medData.mg,
@@ -148,6 +151,8 @@ window.addRecord=async function(){
   document.getElementById("date").value="";
   document.getElementById("barangaySelect").value="";
   toggleBarangayTextbox();
+  document.getElementById("problem").value="";
+  document.getElementById("blockLeader").value="";
   document.getElementById("medicineType").value="";
   document.getElementById("medicineSearch").value="";
   document.getElementById("price").value="";
@@ -168,6 +173,8 @@ async function loadHistory(){
         <td>${d.date}</td>
         <td>${d.patientName}</td>
         <td>${d.barangay}</td>
+        <td>${d.problem}</td>
+        <td>${d.blockLeader}</td>
         <td>${d.medicineType}</td>
         <td>${d.medicine}</td>
         <td>${d.quantity}</td>
@@ -232,6 +239,8 @@ window.exportExcel=async function(){
       </select>
       <input type="text" class="form-control mt-1" id="barangayTextbox" placeholder="Enter Barangay" style="display:none;">
     </div>
+    <div class="col-md-2"><input type="text" class="form-control" id="problem" placeholder="Problem Presented"></div>
+    <div class="col-md-2"><input type="text" class="form-control" id="blockLeader" placeholder="Block Leader"></div>
     <div class="col-md-2">
       <select class="form-select" id="medicineType">
         <option value="">Select Type</option>
@@ -260,6 +269,8 @@ window.exportExcel=async function(){
         <th>Date</th>
         <th>Name</th>
         <th>Barangay</th>
+        <th>Problem</th>
+        <th>Block Leader</th>
         <th>Type</th>
         <th>Medicine</th>
         <th>Qty</th>
