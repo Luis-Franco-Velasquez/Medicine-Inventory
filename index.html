@@ -66,7 +66,7 @@ window.searchMedicine = async function() {
   });
 };
 
-// Select medicine
+// Select medicine and add to list
 function selectMedicine(id, data) {
   if(selectedMedicinesList.find(m => m.id === id)) {
     alert("Medicine already added!");
@@ -77,9 +77,9 @@ function selectMedicine(id, data) {
     id,
     name: data.name,
     mg: data.mg,
-    price: data.price,
+    price: parseFloat(data.price),
     quantity: 1,
-    total: data.price
+    total: parseFloat(data.price)
   };
   selectedMedicinesList.push(medEntry);
   renderSelectedMedicines();
@@ -87,7 +87,7 @@ function selectMedicine(id, data) {
   document.getElementById("medicineResults").innerHTML = "";
 }
 
-// Render selected medicines
+// Render the selected medicines in a scrollable container
 function renderSelectedMedicines() {
   const container = document.getElementById("selectedMedicines");
   container.innerHTML = "";
@@ -95,14 +95,17 @@ function renderSelectedMedicines() {
 
   selectedMedicinesList.forEach((med, index) => {
     grandTotal += parseFloat(med.total);
+
     const div = document.createElement("div");
-    div.className = "d-flex align-items-center mb-1 gap-2";
+    div.className = "d-flex align-items-center gap-2 mb-1 flex-wrap";
     div.innerHTML = `
-      <span>${med.name} - ${med.mg}</span>
-      Qty: <input type="number" value="${med.quantity}" min="1" style="width:60px;" onchange="updateMedicineQty(${index}, this.value)">
-      Price: <input type="number" value="${med.price}" min="0" step="0.01" style="width:80px;" onchange="updateMedicinePrice(${index}, this.value)">
-      <span>₱ <span>${med.total.toFixed(2)}</span></span>
-      <button type="button" class="btn btn-sm btn-danger" onclick="removeMedicine(${index})">Remove</button>
+      <span class="me-2">${med.name} - ${med.mg}</span>
+      Qty: <input type="number" value="${med.quantity}" min="1" style="width:60px;" 
+        onchange="updateMedicineQty(${index}, this)">
+      Price: <input type="number" value="${med.price}" min="0" step="0.01" style="width:80px;" 
+        onchange="updateMedicinePrice(${index}, this)">
+      Total: ₱ <span>${med.total.toFixed(2)}</span>
+      <button type="button" class="btn btn-sm btn-danger ms-2" onclick="removeMedicine(${index})">Remove</button>
     `;
     container.appendChild(div);
   });
@@ -111,26 +114,28 @@ function renderSelectedMedicines() {
 }
 
 // Update quantity
-function updateMedicineQty(index, qty) {
-  qty = parseInt(qty);
+function updateMedicineQty(index, inputElem) {
+  const qty = parseInt(inputElem.value);
   if(qty <= 0) return;
   selectedMedicinesList[index].quantity = qty;
   selectedMedicinesList[index].total = qty * selectedMedicinesList[index].price;
-  renderSelectedMedicines();
+  inputElem.parentElement.querySelector("span").textContent = selectedMedicinesList[index].total.toFixed(2);
+  document.getElementById("grandTotal").textContent = selectedMedicinesList.reduce((sum,m)=>sum + m.total,0).toFixed(2);
 }
 
 // Update price
-function updateMedicinePrice(index, price){
-  price = parseFloat(price);
+function updateMedicinePrice(index, inputElem) {
+  const price = parseFloat(inputElem.value);
   if(price < 0) return;
   selectedMedicinesList[index].price = price;
   selectedMedicinesList[index].total = price * selectedMedicinesList[index].quantity;
-  renderSelectedMedicines();
+  inputElem.parentElement.querySelector("span").textContent = selectedMedicinesList[index].total.toFixed(2);
+  document.getElementById("grandTotal").textContent = selectedMedicinesList.reduce((sum,m)=>sum + m.total,0).toFixed(2);
 }
 
 // Remove medicine
 function removeMedicine(index) {
-  selectedMedicinesList.splice(index, 1);
+  selectedMedicinesList.splice(index,1);
   renderSelectedMedicines();
 }
 
@@ -161,7 +166,7 @@ window.addRecord = async function() {
     return;
   }
 
-  // Check stock
+  // Check stock for all medicines
   for(const med of selectedMedicinesList){
     const medRef = doc(db, currentCollection, med.id);
     const medSnap = await getDoc(medRef);
@@ -191,9 +196,9 @@ window.addRecord = async function() {
       mg: m.mg,
       quantity: m.quantity,
       price_at_time: m.price,
-      total: m.total
+      total: parseFloat(m.total)
     })),
-    total: selectedMedicinesList.reduce((sum,m)=>sum+m.total,0)
+    total: selectedMedicinesList.reduce((sum,m)=>sum + parseFloat(m.total),0)
   });
 
   alert("Record Saved!");
@@ -216,14 +221,9 @@ async function loadHistory(){
   const snapshot = await getDocs(collection(db,"medical_records"));
   const table = document.getElementById("history");
   table.innerHTML = "";
-
   snapshot.forEach(docSnap=>{
     const d = docSnap.data();
-    const recordId = docSnap.id;
-
-    // Collapsible button
-    const collapseId = `collapse-${recordId}`;
-
+    const meds = d.medicines.map(m=>`${m.name} (Qty:${m.quantity}, Price:${m.price_at_time})`).join(", ");
     table.innerHTML += `
       <tr>
         <td>${d.date}</td>
@@ -232,77 +232,15 @@ async function loadHistory(){
         <td>${d.problem}</td>
         <td>${d.blockLeader}</td>
         <td>${d.medicineType}</td>
-        <td>
-          <button class="btn btn-sm btn-info" data-bs-toggle="collapse" data-bs-target="#${collapseId}">
-            Show Medicines
-          </button>
-          <div class="collapse mt-2" id="${collapseId}">
-            <table class="table table-sm table-bordered mb-0">
-              <thead class="table-light">
-                <tr>
-                  <th>Medicine</th>
-                  <th>Qty</th>
-                  <th>Price</th>
-                  <th>Total</th>
-                </tr>
-              </thead>
-              <tbody>
-                ${d.medicines.map((m, idx)=>`
-                  <tr>
-                    <td>${m.name} (${m.mg})</td>
-                    <td><input type="number" value="${m.quantity}" min="1" style="width:60px;" onchange="updateHistoryQty('${recordId}', ${idx}, this.value)"></td>
-                    <td><input type="number" value="${m.price_at_time}" min="0" step="0.01" style="width:80px;" onchange="updateHistoryPrice('${recordId}', ${idx}, this.value)"></td>
-                    <td>₱ <span id="total-${recordId}-${idx}">${m.total.toFixed(2)}</span></td>
-                  </tr>
-                `).join("")}
-              </tbody>
-            </table>
-          </div>
-        </td>
-        <td>₱ <span id="recordTotal-${recordId}">${d.total.toFixed(2)}</span></td>
+        <td>${meds}</td>
+        <td>₱ ${d.total.toFixed(2)}</td>
       </tr>`;
   });
 }
-
-// Update history qty & price
-window.updateHistoryQty = async function(recordId, medIndex, qty){
-  qty = parseInt(qty);
-  if(qty <= 0) return;
-
-  const recordRef = doc(db,"medical_records",recordId);
-  const snap = await getDoc(recordRef);
-  const data = snap.data();
-
-  data.medicines[medIndex].quantity = qty;
-  data.medicines[medIndex].total = qty * data.medicines[medIndex].price_at_time;
-  data.total = data.medicines.reduce((sum,m)=>sum + m.total,0);
-
-  await updateDoc(recordRef, data);
-  document.getElementById(`total-${recordId}-${medIndex}`).textContent = data.medicines[medIndex].total.toFixed(2);
-  document.getElementById(`recordTotal-${recordId}`).textContent = data.total.toFixed(2);
-};
-
-window.updateHistoryPrice = async function(recordId, medIndex, price){
-  price = parseFloat(price);
-  if(price < 0) return;
-
-  const recordRef = doc(db,"medical_records",recordId);
-  const snap = await getDoc(recordRef);
-  const data = snap.data();
-
-  data.medicines[medIndex].price_at_time = price;
-  data.medicines[medIndex].total = price * data.medicines[medIndex].quantity;
-  data.total = data.medicines.reduce((sum,m)=>sum + m.total,0);
-
-  await updateDoc(recordRef, data);
-  document.getElementById(`total-${recordId}-${medIndex}`).textContent = data.medicines[medIndex].total.toFixed(2);
-  document.getElementById(`recordTotal-${recordId}`).textContent = data.total.toFixed(2);
-};
-
-window.loadHistory=loadHistory;
+window.loadHistory = loadHistory;
 loadHistory();
 
-// Export Excel
+// Excel export
 window.exportExcel=async function(){
   const snapshot = await getDocs(collection(db,"medical_records"));
   const data=[];
@@ -313,6 +251,15 @@ window.exportExcel=async function(){
   XLSX.writeFile(wb,"Medical_Report.xlsx");
 };
 </script>
+<style>
+#selectedMedicines {
+  max-height: 150px;
+  overflow-y: auto;
+  padding: 5px;
+  border: 1px solid #ccc;
+  border-radius: 5px;
+}
+</style>
 </head>
 
 <body class="container py-4">
@@ -323,17 +270,10 @@ window.exportExcel=async function(){
 
 <!-- Patient Form -->
 <div class="card p-3 mb-4">
-  <div class="row mb-2">
-    <div class="col-md-3">
-      <label>Date:</label>
-      <input type="date" class="form-control" id="date">
-    </div>
-    <div class="col-md-5">
-      <label>Name:</label>
-      <input type="text" class="form-control" id="patientName" placeholder="Patient Name">
-    </div>
-    <div class="col-md-4">
-      <label>Barangay:</label>
+  <div class="row g-2 mb-2">
+    <div class="col-md-2"><label>Date:</label><input type="date" class="form-control" id="date"></div>
+    <div class="col-md-4"><label>Name:</label><input type="text" class="form-control" id="patientName" placeholder="Patient Name"></div>
+    <div class="col-md-3"><label>Barangay:</label>
       <select class="form-select" id="barangaySelect" onchange="toggleBarangayTextbox()">
         <option value="">Select Barangay</option>
         <option value="Aduas Centro">Aduas Centro</option>
@@ -363,34 +303,24 @@ window.exportExcel=async function(){
       </select>
       <input type="text" class="form-control mt-1" id="barangayTextbox" placeholder="Enter Barangay" style="display:none;">
     </div>
+    <div class="col-md-3"><label>Block Leader:</label><input type="text" class="form-control" id="blockLeader" placeholder="Block Leader"></div>
   </div>
-
-  <div class="row mb-2">
-    <div class="col-md-6">
-      <label>Block Leader:</label>
-      <input type="text" class="form-control" id="blockLeader" placeholder="Block Leader">
-    </div>
-    <div class="col-md-6">
-      <label>Problem Presented:</label>
-      <input type="text" class="form-control" id="problem" placeholder="Problem Presented">
-    </div>
+  <div class="row g-2 mb-2">
+    <div class="col-md-12"><label>Problem Presented:</label><input type="text" class="form-control" id="problem" placeholder="Problem Presented"></div>
   </div>
-
-  <div class="row mb-2">
-    <div class="col-md-3">
-      <label>Medicine Type:</label>
+  <div class="row g-2 mb-2">
+    <div class="col-md-3"><label>Medicine Type:</label>
       <select class="form-select" id="medicineType">
         <option value="">Select Type</option>
         <option>Adult</option>
         <option>Pedia</option>
       </select>
     </div>
-    <div class="col-md-5">
-      <label>Search Medicine:</label>
+    <div class="col-md-6"><label>Search & Add Medicine:</label>
       <input type="text" class="form-control" id="medicineSearch" placeholder="Search medicine..." oninput="searchMedicine()">
       <div id="medicineResults" class="list-group position-absolute w-100" style="z-index:10;"></div>
     </div>
-    <div class="col-md-4">
+    <div class="col-md-3">
       <label>Selected Medicines:</label>
       <div id="selectedMedicines"></div>
       <div class="mt-1 d-flex justify-content-end">
@@ -398,14 +328,9 @@ window.exportExcel=async function(){
       </div>
     </div>
   </div>
-
   <div class="row mt-2">
-    <div class="col-md-2">
-      <button class="btn btn-primary w-100" onclick="addRecord()">Save</button>
-    </div>
-    <div class="col-md-2">
-      <button class="btn btn-warning w-100" onclick="exportExcel()">Export Excel</button>
-    </div>
+    <div class="col-md-2"><button class="btn btn-primary w-100" onclick="addRecord()">Save Record</button></div>
+    <div class="col-md-2"><button class="btn btn-warning w-100" onclick="exportExcel()">Export Excel</button></div>
   </div>
 </div>
 
@@ -428,6 +353,5 @@ window.exportExcel=async function(){
   </table>
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>
