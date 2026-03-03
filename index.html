@@ -4,14 +4,159 @@
 <meta charset="UTF-8">
 <title>Medical Mission System</title>
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+
+<body class="container py-4">
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h2>Medical Mission System</h2>
+  <a href="inventory.html" class="btn btn-success">View Inventory</a>
+</div>
+
+<!-- ================= PATIENT FORM ================= -->
+<div class="card p-3 mb-4">
+
+  <div class="row g-3 mb-2">
+    <div class="col-md-2">
+      <label>Date:</label>
+      <input type="date" class="form-control" id="date">
+    </div>
+
+    <div class="col-md-3">
+      <label>Name:</label>
+      <input type="text" class="form-control" id="patientName">
+    </div>
+
+    <div class="col-md-3">
+      <label>Barangay:</label>
+      <select class="form-select" id="barangaySelect">
+        <option value="">Select Barangay</option>
+        <option>Aduas Centro</option>
+        <option>Aduas Norte</option>
+        <option>Aduas Sur</option>
+        <option>Barrera</option>
+        <option>Cantarilla</option>
+        <option>Cruz Roja</option>
+        <option>Daan Sarile</option>
+        <option>Dimasalang</option>
+        <option>D.S. Garcia</option>
+        <option>Gen. Luna</option>
+        <option>Imelda</option>
+        <option>Isla</option>
+        <option>M.S. Garcia</option>
+        <option>Nabao</option>
+        <option>Obrero</option>
+        <option>Pagas</option>
+        <option>Pag-Asa</option>
+        <option>San Juan Acffa</option>
+        <option>San Roque Norte</option>
+        <option>San Roque Sur</option>
+        <option>Sanbermicristi</option>
+        <option>Sumacab Este</option>
+        <option>Valdefuente</option>
+        <option>Other</option>
+      </select>
+      <input type="text" class="form-control mt-1" id="barangayTextbox" placeholder="Enter Barangay" style="display:none;">
+    </div>
+
+    <div class="col-md-2">
+      <label>Block Leader:</label>
+      <input type="text" class="form-control" id="blockLeader">
+    </div>
+  </div>
+
+  <div class="row g-3 mb-2">
+    <div class="col-md-6">
+      <label>Problem:</label>
+      <input type="text" class="form-control" id="problem">
+    </div>
+
+    <div class="col-md-3">
+      <label>Type:</label>
+      <select class="form-select" id="medicineType">
+        <option value="">Select Type</option>
+        <option>Adult</option>
+        <option>Pedia</option>
+      </select>
+    </div>
+
+    <div class="col-md-3 position-relative">
+      <label>Search Medicine:</label>
+      <input type="text" class="form-control" id="medicineSearch">
+      <div id="medicineResults" class="list-group position-absolute w-100" style="z-index:10;"></div>
+
+      <div id="selectedMedicines" class="mt-2"></div>
+
+      <div class="mt-1 text-end">
+        <strong>Total: ₱ <span id="grandTotal">0.00</span></strong>
+      </div>
+    </div>
+  </div>
+
+  <div class="text-end">
+    <button class="btn btn-primary me-2" id="saveBtn">Save</button>
+    <button class="btn btn-warning" id="exportBtn">Export Excel</button>
+  </div>
+
+</div>
+
+<!-- ================= FILTER ================= -->
+<div class="mb-2">
+  <label>Filter by Barangay:</label>
+  <select class="form-select w-25" id="filterBarangay">
+    <option value="">All Barangays</option>
+    <option>Aduas Centro</option>
+    <option>Aduas Norte</option>
+    <option>Aduas Sur</option>
+    <option>Barrera</option>
+    <option>Cantarilla</option>
+    <option>Cruz Roja</option>
+    <option>Daan Sarile</option>
+    <option>Dimasalang</option>
+    <option>D.S. Garcia</option>
+    <option>Gen. Luna</option>
+    <option>Imelda</option>
+    <option>Isla</option>
+    <option>M.S. Garcia</option>
+    <option>Nabao</option>
+    <option>Obrero</option>
+    <option>Pagas</option>
+    <option>Pag-Asa</option>
+    <option>San Juan Acffa</option>
+    <option>San Roque Norte</option>
+    <option>San Roque Sur</option>
+    <option>Sanbermicristi</option>
+    <option>Sumacab Este</option>
+    <option>Valdefuente</option>
+  </select>
+</div>
+
+<!-- ================= HISTORY TABLE ================= -->
+<div class="table-responsive">
+<table class="table table-bordered table-striped">
+<thead class="table-dark">
+<tr>
+<th>Date</th>
+<th>Name</th>
+<th>Barangay</th>
+<th>Problem</th>
+<th>Block Leader</th>
+<th>Type</th>
+<th>Medicines</th>
+<th>Total</th>
+</tr>
+</thead>
+<tbody id="history"></tbody>
+</table>
+</div>
+
+<!-- ================= SCRIPT ================= -->
 <script type="module">
+
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-import {
-  getFirestore, collection, addDoc, getDocs, doc, updateDoc, getDoc
-} from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import { getFirestore, collection, addDoc, getDocs, doc, updateDoc, getDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 import * as XLSX from "https://cdn.jsdelivr.net/npm/xlsx@0.18.5/+esm";
 
-/* Firebase Config */
 const firebaseConfig = {
   apiKey: "AIzaSyDkuo0jjGYIBC1MKOWD42XvcB4nWy_72qQ",
   authDomain: "medicine-inventory-cc500.firebaseapp.com",
@@ -28,369 +173,136 @@ const db = getFirestore(app);
 let currentCollection = "";
 let selectedMedicinesList = [];
 
-// Medicine Type select
-document.getElementById("medicineType")?.addEventListener("change", (e)=>{
-  const type = e.target.value;
-  if(!type) return;
-  currentCollection = type==="Adult"?"adult_medicine":"pedia_medicine";
-  document.getElementById("medicineSearch").value="";
-  document.getElementById("medicineResults").innerHTML="";
+const medicineType = document.getElementById("medicineType");
+const medicineSearch = document.getElementById("medicineSearch");
+const resultsDiv = document.getElementById("medicineResults");
+const selectedContainer = document.getElementById("selectedMedicines");
+
+medicineType.addEventListener("change", () => {
+  currentCollection = medicineType.value === "Adult" ? "adult_medicine" : "pedia_medicine";
   selectedMedicinesList = [];
-  renderSelectedMedicines();
+  renderSelected();
 });
 
-// Search medicine
-window.searchMedicine = async function() {
-  const queryText = document.getElementById("medicineSearch").value.toLowerCase();
-  const resultsDiv = document.getElementById("medicineResults");
+medicineSearch.addEventListener("input", async () => {
   resultsDiv.innerHTML = "";
-  if(!queryText || !currentCollection) return;
+  if (!medicineSearch.value || !currentCollection) return;
 
-  const snapshot = await getDocs(collection(db,currentCollection));
-  snapshot.forEach(docSnap=>{
-    const data = docSnap.data();
-    if(data.name.toLowerCase().includes(queryText)){
-      const item = document.createElement("a");
-      item.href="#";
-      item.className="list-group-item list-group-item-action";
-      item.textContent=`${data.name} - ${data.mg} (Stock: ${data.qty})`;
-      item.onclick=()=>selectMedicine(docSnap.id,data);
-      resultsDiv.appendChild(item);
+  const snap = await getDocs(collection(db, currentCollection));
+  snap.forEach(d => {
+    const data = d.data();
+    if (data.name.toLowerCase().includes(medicineSearch.value.toLowerCase())) {
+      const a = document.createElement("a");
+      a.href="#";
+      a.className="list-group-item list-group-item-action";
+      a.textContent=`${data.name} - ${data.mg} (Stock:${data.qty})`;
+      a.onclick=()=>addMedicine(d.id,data);
+      resultsDiv.appendChild(a);
     }
   });
-};
+});
 
-// Select medicine and add to list
-function selectMedicine(id, data) {
-  if(selectedMedicinesList.find(m => m.id === id)) {
-    alert("Medicine already added!");
-    return;
-  }
-
-  const medEntry = {
-    id,
-    name: data.name,
-    mg: data.mg,
-    price: parseFloat(data.price),
-    quantity: 1,
-    total: parseFloat(data.price)
-  };
-  selectedMedicinesList.push(medEntry);
-  renderSelectedMedicines();
-  document.getElementById("medicineSearch").value = "";
-  document.getElementById("medicineResults").innerHTML = "";
+function addMedicine(id,data){
+  if(selectedMedicinesList.find(m=>m.id===id)) return alert("Already added!");
+  selectedMedicinesList.push({id,name:data.name,mg:data.mg,price:parseFloat(data.price),quantity:1,total:data.price});
+  renderSelected();
+  medicineSearch.value="";
+  resultsDiv.innerHTML="";
 }
 
-// Render selected medicines with labels
-function renderSelectedMedicines() {
-  const container = document.getElementById("selectedMedicines");
-  container.innerHTML = "";
-  let grandTotal = 0;
+function renderSelected(){
+  selectedContainer.innerHTML="";
+  let total=0;
 
-  selectedMedicinesList.forEach((med, index) => {
-    grandTotal += parseFloat(med.total);
+  selectedMedicinesList.forEach((m,i)=>{
+    total+=parseFloat(m.total);
 
-    const div = document.createElement("div");
-    div.className = "d-flex flex-wrap align-items-center mb-1 gap-2 border p-2 rounded";
-    div.innerHTML = `
-      <div style="flex:2"><strong>${med.name} - ${med.mg}</strong></div>
-      <div style="flex:1">
-        <label>Qty:</label>
-        <input type="number" value="${med.quantity}" min="1" style="width:60px;" onchange="updateMedicineQty(${index}, this.value)">
-      </div>
-      <div style="flex:1">
-        <label>Price:</label>
-        <input type="number" value="${med.price}" min="0" step="0.01" style="width:80px;" onchange="updateMedicinePrice(${index}, this.value)">
-      </div>
-      <div style="flex:1">
-        <label>Total:</label>
-        <input type="number" value="${med.total}" style="width:80px;" readonly>
-      </div>
-      <div style="flex:1">
-        <button type="button" class="btn btn-sm btn-danger" onclick="removeMedicine(${index})">Remove</button>
-      </div>
+    const div=document.createElement("div");
+    div.className="border p-2 mb-2 rounded";
+
+    div.innerHTML=`
+      <strong>${m.name} - ${m.mg}</strong><br>
+      Qty: <input type="number" value="${m.quantity}" min="1" style="width:60px">
+      Price: <input type="number" value="${m.price}" step="0.01" style="width:80px">
+      Total: ₱${m.total}
+      <button class="btn btn-sm btn-danger float-end">Remove</button>
     `;
-    container.appendChild(div);
-  });
 
-  document.getElementById("grandTotal").textContent = grandTotal.toFixed(2);
-}
-
-// Update quantity
-function updateMedicineQty(index, qty) {
-  qty = parseInt(qty);
-  if(qty <= 0) return;
-  selectedMedicinesList[index].quantity = qty;
-  selectedMedicinesList[index].total = (qty * selectedMedicinesList[index].price).toFixed(2);
-  renderSelectedMedicines();
-}
-
-// Update price
-function updateMedicinePrice(index, price) {
-  price = parseFloat(price);
-  if(price < 0) return;
-  selectedMedicinesList[index].price = price;
-  selectedMedicinesList[index].total = (price * selectedMedicinesList[index].quantity).toFixed(2);
-  renderSelectedMedicines();
-}
-
-// Remove medicine
-function removeMedicine(index) {
-  selectedMedicinesList.splice(index, 1);
-  renderSelectedMedicines();
-}
-
-// Toggle barangay textbox
-window.toggleBarangayTextbox = function(){
-  const select=document.getElementById("barangaySelect");
-  const textbox=document.getElementById("barangayTextbox");
-  if(select.value==="Other"){
-    textbox.style.display="block";
-  } else{
-    textbox.style.display="none";
-    textbox.value="";
-  }
-};
-
-// Add patient record
-window.addRecord = async function() {
-  const patientName = document.getElementById("patientName").value.trim();
-  const date = document.getElementById("date").value;
-  const selectedBarangay = document.getElementById("barangaySelect").value;
-  const barangay = selectedBarangay==="Other"?document.getElementById("barangayTextbox").value.trim():selectedBarangay;
-  const problem = document.getElementById("problem").value.trim();
-  const blockLeader = document.getElementById("blockLeader").value.trim();
-  const medType = document.getElementById("medicineType").value;
-
-  if(!patientName || !date || !barangay || !problem || !blockLeader || !medType || selectedMedicinesList.length === 0){
-    alert("Please fill all required fields and select at least one medicine!"); 
-    return;
-  }
-
-  // Check stock for all medicines
-  for(const med of selectedMedicinesList){
-    const medRef = doc(db, currentCollection, med.id);
-    const medSnap = await getDoc(medRef);
-    const medData = medSnap.data();
-    if(!medData) { alert(`Medicine ${med.name} not found!`); return; }
-    if(med.quantity > medData.qty){ alert(`Not enough stock for ${med.name}!`); return; }
-  }
-
-  // Deduct stock
-  for(const med of selectedMedicinesList){
-    const medRef = doc(db, currentCollection, med.id);
-    const medSnap = await getDoc(medRef);
-    const medData = medSnap.data();
-    await updateDoc(medRef, { qty: medData.qty - med.quantity });
-  }
-
-  // Save record with all medicines
-  await addDoc(collection(db,"medical_records"),{
-    patientName,
-    date,
-    barangay,
-    problem,
-    blockLeader,
-    medicineType: medType,
-    medicines: selectedMedicinesList.map(m=>({
-      name: m.name,
-      mg: m.mg,
-      quantity: m.quantity,
-      price_at_time: m.price,
-      total: parseFloat(m.total)
-    })),
-    total: selectedMedicinesList.reduce((sum,m)=>sum + parseFloat(m.total),0)
-  });
-
-  alert("Record Saved!");
-  selectedMedicinesList = [];
-  renderSelectedMedicines();
-  loadHistory();
-
-  // Reset form
-  document.getElementById("patientName").value="";
-  document.getElementById("date").value="";
-  document.getElementById("barangaySelect").value="";
-  toggleBarangayTextbox();
-  document.getElementById("problem").value="";
-  document.getElementById("blockLeader").value="";
-  document.getElementById("medicineType").value="";
-};
-
-// Load patient history with filter
-window.loadHistory = async function(filterBarangay="") {
-  const snapshot = await getDocs(collection(db,"medical_records"));
-  const table = document.getElementById("history");
-  table.innerHTML = "";
-  snapshot.forEach(docSnap=>{
-    const d = docSnap.data();
-    if(filterBarangay && d.barangay !== filterBarangay) return;
-    const meds = d.medicines.map(m=>`${m.name} (Qty:${m.quantity},₱${m.price_at_time})`).join(", ");
-    table.innerHTML += `
-      <tr>
-        <td>${d.date}</td>
-        <td>${d.patientName}</td>
-        <td>${d.barangay}</td>
-        <td>${d.problem}</td>
-        <td>${d.blockLeader}</td>
-        <td>${d.medicineType}</td>
-        <td>${meds}</td>
-        <td>${d.total}</td>
-      </tr>`;
-  });
-};
-
-// Filter by Barangay
-window.filterBarangay = function() {
-  const val = document.getElementById("filterBarangay").value;
-  loadHistory(val);
-};
-
-// Export Excel
-window.exportExcel = async function() {
-  const filterVal = document.getElementById("filterBarangay").value;
-  const snapshot = await getDocs(collection(db,"medical_records"));
-  const data=[];
-  snapshot.forEach(docSnap=>{
-    const d = docSnap.data();
-    if(filterVal && d.barangay !== filterVal) return;
-    const record = {
-      Date: d.date,
-      Name: d.patientName,
-      Barangay: d.barangay,
-      Problem: d.problem,
-      BlockLeader: d.blockLeader,
-      Type: d.medicineType,
-      Medicines: d.medicines.map(m=>`${m.name} (Qty:${m.quantity},₱${m.price_at_time})`).join(", "),
-      Total: d.total
+    div.querySelectorAll("input")[0].onchange=e=>{
+      m.quantity=parseInt(e.target.value);
+      m.total=(m.quantity*m.price).toFixed(2);
+      renderSelected();
     };
-    data.push(record);
+
+    div.querySelectorAll("input")[1].onchange=e=>{
+      m.price=parseFloat(e.target.value);
+      m.total=(m.quantity*m.price).toFixed(2);
+      renderSelected();
+    };
+
+    div.querySelector("button").onclick=()=>{
+      selectedMedicinesList.splice(i,1);
+      renderSelected();
+    };
+
+    selectedContainer.appendChild(div);
   });
+
+  document.getElementById("grandTotal").textContent=total.toFixed(2);
+}
+
+document.getElementById("saveBtn").onclick=async()=>{
+  if(selectedMedicinesList.length===0) return alert("Add medicine first!");
+
+  await addDoc(collection(db,"medical_records"),{
+    patientName:document.getElementById("patientName").value,
+    date:document.getElementById("date").value,
+    barangay:document.getElementById("barangaySelect").value,
+    problem:document.getElementById("problem").value,
+    blockLeader:document.getElementById("blockLeader").value,
+    medicineType:medicineType.value,
+    medicines:selectedMedicinesList,
+    total:selectedMedicinesList.reduce((s,m)=>s+parseFloat(m.total),0)
+  });
+
+  alert("Saved!");
+  selectedMedicinesList=[];
+  renderSelected();
+  loadHistory();
+};
+
+async function loadHistory(){
+  const snap=await getDocs(collection(db,"medical_records"));
+  const table=document.getElementById("history");
+  table.innerHTML="";
+  snap.forEach(d=>{
+    const data=d.data();
+    table.innerHTML+=`
+      <tr>
+        <td>${data.date}</td>
+        <td>${data.patientName}</td>
+        <td>${data.barangay}</td>
+        <td>${data.problem}</td>
+        <td>${data.blockLeader}</td>
+        <td>${data.medicineType}</td>
+        <td>${data.medicines.map(m=>m.name+" (Qty:"+m.quantity+")").join(", ")}</td>
+        <td>${data.total}</td>
+      </tr>
+    `;
+  });
+}
+loadHistory();
+
+document.getElementById("exportBtn").onclick=async()=>{
+  const snap=await getDocs(collection(db,"medical_records"));
+  const data=[];
+  snap.forEach(d=>data.push(d.data()));
   const ws=XLSX.utils.json_to_sheet(data);
   const wb=XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb,ws,"Records");
   XLSX.writeFile(wb,"Medical_Report.xlsx");
 };
 
-loadHistory();
 </script>
-</head>
-
-<body class="container py-4">
-<div class="d-flex justify-content-between align-items-center mb-3">
-  <h2>Medical Mission System</h2>
-  <a href="inventory.html" class="btn btn-success">View Inventory</a>
-</div>
-
-<!-- Patient Form -->
-<div class="card p-3 mb-4">
-  <div class="row g-3 mb-2">
-    <div class="col-md-2"><label>Date:</label><input type="date" class="form-control" id="date"></div>
-    <div class="col-md-3"><label>Name:</label><input type="text" class="form-control" id="patientName" placeholder="Patient Name"></div>
-    <div class="col-md-3"><label>Barangay:</label>
-      <select class="form-select" id="barangaySelect" onchange="toggleBarangayTextbox()">
-        <option value="">Select Barangay</option>
-        <option value="Aduas Centro">Aduas Centro</option>
-        <option value="Aduas Norte">Aduas Norte</option>
-        <option value="Aduas Sur">Aduas Sur</option>
-        <option value="Barrera">Barrera</option>
-        <option value="Cantarilla">Cantarilla</option>
-        <option value="Cruz Roja">Cruz Roja</option>
-        <option value="Daan Sarile">Daan Sarile</option>
-        <option value="Dimasalang">Dimasalang</option>
-        <option value="D.S. Garcia">D.S. Garcia</option>
-        <option value="Gen. Luna">Gen. Luna</option>
-        <option value="Imelda">Imelda</option>
-        <option value="Isla">Isla</option>
-        <option value="M.S. Garcia">M.S. Garcia</option>
-        <option value="Nabao">Nabao</option>
-        <option value="Obrero">Obrero</option>
-        <option value="Pagas">Pagas</option>
-        <option value="Pag-Asa">Pag-Asa</option>
-        <option value="San Juan Acffa">San Juan Acffa</option>
-        <option value="San Roque Norte">San Roque Norte</option>
-        <option value="San Roque Sur">San Roque Sur</option>
-        <option value="Sanbermicristi">Sanbermicristi</option>
-        <option value="Sumacab Este">Sumacab Este</option>
-        <option value="Valdefuente">Valdefuente</option>
-        <option value="Other">Other</option>
-      </select>
-      <input type="text" class="form-control mt-1" id="barangayTextbox" placeholder="Enter Barangay" style="display:none;">
-    </div>
-    <div class="col-md-2"><label>Block Leader:</label><input type="text" class="form-control" id="blockLeader" placeholder="Block Leader"></div>
-  </div>
-  <div class="row g-3 mb-2">
-    <div class="col-md-6"><label>Problem Presented:</label><input type="text" class="form-control" id="problem" placeholder="Problem Presented"></div>
-    <div class="col-md-3"><label>Type:</label>
-      <select class="form-select" id="medicineType">
-        <option value="">Select Type</option>
-        <option>Adult</option>
-        <option>Pedia</option>
-      </select>
-    </div>
-    <div class="col-md-3"><label>Search Medicine:</label>
-      <input type="text" class="form-control" id="medicineSearch" placeholder="Search medicine..." oninput="searchMedicine()">
-      <div id="medicineResults" class="list-group position-absolute w-100" style="z-index:10;"></div>
-      <div id="selectedMedicines" class="mt-2"></div>
-      <div class="mt-1 d-flex justify-content-end">
-        <strong>Total: ₱ <span id="grandTotal">0.00</span></strong>
-      </div>
-    </div>
-  </div>
-  <div class="d-flex justify-content-end">
-    <button class="btn btn-primary me-2" onclick="addRecord()">Save</button>
-    <button class="btn btn-warning" onclick="exportExcel()">Export Excel</button>
-  </div>
-</div>
-
-<!-- Filter -->
-<div class="mb-2">
-  <label>Filter by Barangay:</label>
-  <select class="form-select w-25" id="filterBarangay" onchange="filterBarangay()">
-    <option value="">All Barangays</option>
-    <option value="Aduas Centro">Aduas Centro</option>
-    <option value="Aduas Norte">Aduas Norte</option>
-    <option value="Aduas Sur">Aduas Sur</option>
-    <option value="Barrera">Barrera</option>
-    <option value="Cantarilla">Cantarilla</option>
-    <option value="Cruz Roja">Cruz Roja</option>
-    <option value="Daan Sarile">Daan Sarile</option>
-    <option value="Dimasalang">Dimasalang</option>
-    <option value="D.S. Garcia">D.S. Garcia</option>
-    <option value="Gen. Luna">Gen. Luna</option>
-    <option value="Imelda">Imelda</option>
-    <option value="Isla">Isla</option>
-    <option value="M.S. Garcia">M.S. Garcia</option>
-    <option value="Nabao">Nabao</option>
-    <option value="Obrero">Obrero</option>
-    <option value="Pagas">Pagas</option>
-    <option value="Pag-Asa">Pag-Asa</option>
-    <option value="San Juan Acffa">San Juan Acffa</option>
-    <option value="San Roque Norte">San Roque Norte</option>
-    <option value="San Roque Sur">San Roque Sur</option>
-    <option value="Sanbermicristi">Sanbermicristi</option>
-    <option value="Sumacab Este">Sumacab Este</option>
-    <option value="Valdefuente">Valdefuente</option>
-  </select>
-</div>
-
-<!-- Patient History Table -->
-<div class="table-responsive">
-  <table class="table table-bordered table-striped">
-    <thead class="table-dark">
-      <tr>
-        <th>Date</th>
-        <th>Name</th>
-        <th>Barangay</th>
-        <th>Problem</th>
-        <th>Block Leader</th>
-        <th>Type</th>
-        <th>Medicines</th>
-        <th>Total</th>
-      </tr>
-    </thead>
-    <tbody id="history"></tbody>
-  </table>
-</div>
 </body>
 </html>
