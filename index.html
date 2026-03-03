@@ -13,8 +13,15 @@
   <a href="inventory.html" class="btn btn-success">View Inventory</a>
 </div>
 
+<!-- ================= DASHBOARD SUMMARY ================= -->
+<div class="card p-3 mb-4">
+  <h5>Dashboard Summary (Total Patients per Barangay)</h5>
+  <ul id="summaryList" class="list-group"></ul>
+</div>
+
 <!-- ================= PATIENT FORM ================= -->
 <div class="card p-3 mb-4">
+  <input type="hidden" id="editId">
 
   <div class="row g-3 mb-2">
     <div class="col-md-2">
@@ -54,9 +61,7 @@
         <option>Sanbermicristi</option>
         <option>Sumacab Este</option>
         <option>Valdefuente</option>
-        <option>Other</option>
       </select>
-      <input type="text" class="form-control mt-1" id="barangayTextbox" placeholder="Enter Barangay" style="display:none;">
     </div>
 
     <div class="col-md-2">
@@ -79,25 +84,12 @@
         <option>Pedia</option>
       </select>
     </div>
-
-    <div class="col-md-3 position-relative">
-      <label>Search Medicine:</label>
-      <input type="text" class="form-control" id="medicineSearch">
-      <div id="medicineResults" class="list-group position-absolute w-100" style="z-index:10;"></div>
-
-      <div id="selectedMedicines" class="mt-2"></div>
-
-      <div class="mt-1 text-end">
-        <strong>Total: ₱ <span id="grandTotal">0.00</span></strong>
-      </div>
-    </div>
   </div>
 
   <div class="text-end">
     <button class="btn btn-primary me-2" id="saveBtn">Save</button>
-    <button class="btn btn-warning" id="exportBtn">Export Excel</button>
+    <button class="btn btn-secondary" id="cancelEditBtn" style="display:none;">Cancel Edit</button>
   </div>
-
 </div>
 
 <!-- ================= FILTER ================= -->
@@ -129,6 +121,8 @@
     <option>Sumacab Este</option>
     <option>Valdefuente</option>
   </select>
+
+  <button class="btn btn-warning mt-2" id="exportBtn">Export Filtered</button>
 </div>
 
 <!-- ================= HISTORY TABLE ================= -->
@@ -142,21 +136,21 @@
 <th>Problem</th>
 <th>Block Leader</th>
 <th>Type</th>
-<th>Medicines</th>
 <th>Total</th>
+<th>Actions</th>
 </tr>
 </thead>
 <tbody id="history"></tbody>
 </table>
 </div>
 
-<!-- ================= SCRIPT ================= -->
 <script type="module">
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-import { getFirestore, collection, addDoc, getDocs, doc, updateDoc, getDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import { getFirestore, collection, addDoc, getDocs, doc, updateDoc, deleteDoc, getDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 import * as XLSX from "https://cdn.jsdelivr.net/npm/xlsx@0.18.5/+esm";
 
+/* ===== FIREBASE CONFIG ===== */
 const firebaseConfig = {
   apiKey: "AIzaSyDkuo0jjGYIBC1MKOWD42XvcB4nWy_72qQ",
   authDomain: "medicine-inventory-cc500.firebaseapp.com",
@@ -170,138 +164,113 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
-let currentCollection = "";
-let selectedMedicinesList = [];
+const historyTable = document.getElementById("history");
+const summaryList = document.getElementById("summaryList");
+const filterBarangay = document.getElementById("filterBarangay");
 
-const medicineType = document.getElementById("medicineType");
-const medicineSearch = document.getElementById("medicineSearch");
-const resultsDiv = document.getElementById("medicineResults");
-const selectedContainer = document.getElementById("selectedMedicines");
+/* ================= LOAD HISTORY ================= */
+async function loadHistory() {
+  const filterValue = filterBarangay.value.trim();
+  const snapshot = await getDocs(collection(db, "medical_records"));
+  historyTable.innerHTML = "";
 
-medicineType.addEventListener("change", () => {
-  currentCollection = medicineType.value === "Adult" ? "adult_medicine" : "pedia_medicine";
-  selectedMedicinesList = [];
-  renderSelected();
-});
+  snapshot.forEach(docSnap => {
+    const d = docSnap.data();
+    if (filterValue && d.barangay !== filterValue) return;
 
-medicineSearch.addEventListener("input", async () => {
-  resultsDiv.innerHTML = "";
-  if (!medicineSearch.value || !currentCollection) return;
-
-  const snap = await getDocs(collection(db, currentCollection));
-  snap.forEach(d => {
-    const data = d.data();
-    if (data.name.toLowerCase().includes(medicineSearch.value.toLowerCase())) {
-      const a = document.createElement("a");
-      a.href="#";
-      a.className="list-group-item list-group-item-action";
-      a.textContent=`${data.name} - ${data.mg} (Stock:${data.qty})`;
-      a.onclick=()=>addMedicine(d.id,data);
-      resultsDiv.appendChild(a);
-    }
-  });
-});
-
-function addMedicine(id,data){
-  if(selectedMedicinesList.find(m=>m.id===id)) return alert("Already added!");
-  selectedMedicinesList.push({id,name:data.name,mg:data.mg,price:parseFloat(data.price),quantity:1,total:data.price});
-  renderSelected();
-  medicineSearch.value="";
-  resultsDiv.innerHTML="";
-}
-
-function renderSelected(){
-  selectedContainer.innerHTML="";
-  let total=0;
-
-  selectedMedicinesList.forEach((m,i)=>{
-    total+=parseFloat(m.total);
-
-    const div=document.createElement("div");
-    div.className="border p-2 mb-2 rounded";
-
-    div.innerHTML=`
-      <strong>${m.name} - ${m.mg}</strong><br>
-      Qty: <input type="number" value="${m.quantity}" min="1" style="width:60px">
-      Price: <input type="number" value="${m.price}" step="0.01" style="width:80px">
-      Total: ₱${m.total}
-      <button class="btn btn-sm btn-danger float-end">Remove</button>
-    `;
-
-    div.querySelectorAll("input")[0].onchange=e=>{
-      m.quantity=parseInt(e.target.value);
-      m.total=(m.quantity*m.price).toFixed(2);
-      renderSelected();
-    };
-
-    div.querySelectorAll("input")[1].onchange=e=>{
-      m.price=parseFloat(e.target.value);
-      m.total=(m.quantity*m.price).toFixed(2);
-      renderSelected();
-    };
-
-    div.querySelector("button").onclick=()=>{
-      selectedMedicinesList.splice(i,1);
-      renderSelected();
-    };
-
-    selectedContainer.appendChild(div);
-  });
-
-  document.getElementById("grandTotal").textContent=total.toFixed(2);
-}
-
-document.getElementById("saveBtn").onclick=async()=>{
-  if(selectedMedicinesList.length===0) return alert("Add medicine first!");
-
-  await addDoc(collection(db,"medical_records"),{
-    patientName:document.getElementById("patientName").value,
-    date:document.getElementById("date").value,
-    barangay:document.getElementById("barangaySelect").value,
-    problem:document.getElementById("problem").value,
-    blockLeader:document.getElementById("blockLeader").value,
-    medicineType:medicineType.value,
-    medicines:selectedMedicinesList,
-    total:selectedMedicinesList.reduce((s,m)=>s+parseFloat(m.total),0)
-  });
-
-  alert("Saved!");
-  selectedMedicinesList=[];
-  renderSelected();
-  loadHistory();
-};
-
-async function loadHistory(){
-  const snap=await getDocs(collection(db,"medical_records"));
-  const table=document.getElementById("history");
-  table.innerHTML="";
-  snap.forEach(d=>{
-    const data=d.data();
-    table.innerHTML+=`
+    historyTable.innerHTML += `
       <tr>
-        <td>${data.date}</td>
-        <td>${data.patientName}</td>
-        <td>${data.barangay}</td>
-        <td>${data.problem}</td>
-        <td>${data.blockLeader}</td>
-        <td>${data.medicineType}</td>
-        <td>${data.medicines.map(m=>m.name+" (Qty:"+m.quantity+")").join(", ")}</td>
-        <td>${data.total}</td>
+        <td>${d.date}</td>
+        <td>${d.patientName}</td>
+        <td>${d.barangay}</td>
+        <td>${d.problem}</td>
+        <td>${d.blockLeader}</td>
+        <td>${d.medicineType}</td>
+        <td>${d.total}</td>
+        <td>
+          <button class="btn btn-sm btn-warning editBtn" data-id="${docSnap.id}">Edit</button>
+          <button class="btn btn-sm btn-danger deleteBtn" data-id="${docSnap.id}">Delete</button>
+        </td>
       </tr>
     `;
   });
-}
-loadHistory();
 
-document.getElementById("exportBtn").onclick=async()=>{
-  const snap=await getDocs(collection(db,"medical_records"));
-  const data=[];
-  snap.forEach(d=>data.push(d.data()));
+  attachActions();
+  loadSummary();
+}
+
+/* ================= DASHBOARD SUMMARY ================= */
+async function loadSummary() {
+  const snapshot = await getDocs(collection(db,"medical_records"));
+  const counts = {};
+  snapshot.forEach(docSnap=>{
+    const b = docSnap.data().barangay;
+    counts[b] = (counts[b] || 0) + 1;
+  });
+
+  summaryList.innerHTML="";
+  for(const barangay in counts){
+    summaryList.innerHTML += `
+      <li class="list-group-item d-flex justify-content-between">
+        ${barangay}
+        <span class="badge bg-primary">${counts[barangay]}</span>
+      </li>
+    `;
+  }
+}
+
+/* ================= DELETE WITH STOCK RETURN ================= */
+async function deleteRecord(id){
+  if(!confirm("Are you sure you want to delete this record?")) return;
+
+  const recordRef = doc(db,"medical_records",id);
+  const recordSnap = await getDoc(recordRef);
+  const recordData = recordSnap.data();
+
+  if(recordData.medicines){
+    for(const med of recordData.medicines){
+      const collectionName = recordData.medicineType === "Adult" ? "adult_medicine" : "pedia_medicine";
+      const medRef = doc(db,collectionName,med.id);
+      const medSnap = await getDoc(medRef);
+      if(medSnap.exists()){
+        const currentQty = medSnap.data().qty;
+        await updateDoc(medRef,{ qty: currentQty + med.quantity });
+      }
+    }
+  }
+
+  await deleteDoc(recordRef);
+  alert("Deleted & stock returned!");
+  loadHistory();
+}
+
+/* ================= EXPORT FILTERED ================= */
+document.getElementById("exportBtn").onclick = async ()=>{
+  const filterValue = filterBarangay.value.trim();
+  const snapshot = await getDocs(collection(db,"medical_records"));
+  const data = [];
+
+  snapshot.forEach(docSnap=>{
+    const d=docSnap.data();
+    if(filterValue && d.barangay !== filterValue) return;
+    data.push(d);
+  });
+
   const ws=XLSX.utils.json_to_sheet(data);
   const wb=XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb,ws,"Records");
-  XLSX.writeFile(wb,"Medical_Report.xlsx");
+  XLSX.writeFile(wb,"Filtered_Medical_Report.xlsx");
 };
+
+function attachActions(){
+  document.querySelectorAll(".deleteBtn").forEach(btn=>{
+    btn.onclick=()=>deleteRecord(btn.dataset.id);
+  });
+}
+
+filterBarangay.addEventListener("change",loadHistory);
+
+loadHistory();
 
 </script>
 </body>
