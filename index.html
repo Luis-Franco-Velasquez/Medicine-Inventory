@@ -26,6 +26,10 @@
       max-height: 250px;
       overflow-y: auto;
     }
+
+    #medicineResults {
+      z-index: 1000;
+    }
   </style>
 </head>
 <body class="container py-4">
@@ -197,7 +201,6 @@
 
     let selectedMedicinesList = [];
     let currentCollection = "";
-
     const historyTable = document.getElementById("history");
     const summaryList = document.getElementById("summaryList");
     const medicineType = document.getElementById("medicineType");
@@ -312,14 +315,55 @@
 
     loadHistory();
 
-    // Medicine Search
+    // Event delegation for Edit and Delete buttons
+    historyTable.addEventListener("click", async (e) => {
+      if (e.target && e.target.matches(".editBtn")) {
+        const recordId = e.target.getAttribute("data-id");
+
+        // Fetch the medical record by ID from Firestore
+        const docRef = doc(db, "medical_records", recordId);
+        const docSnap = await getDoc(docRef);
+
+        if (docSnap.exists()) {
+          const data = docSnap.data();
+
+          // Fill the form with the existing data for editing
+          document.getElementById("editId").value = docSnap.id;
+          document.getElementById("date").value = data.date;
+          document.getElementById("patientName").value = data.patientName;
+          document.getElementById("barangaySelect").value = data.barangay;
+          document.getElementById("blockLeader").value = data.blockLeader;
+          document.getElementById("problem").value = data.problem;
+          document.getElementById("medicineType").value = data.medicineType;
+
+          // Pre-populate selected medicines list
+          selectedMedicinesList = data.medicines;
+          renderSelectedMedicines();
+
+          document.getElementById("cancelEditBtn").style.display = "inline";
+          document.getElementById("saveBtn").style.display = "inline";
+        }
+      }
+
+      if (e.target && e.target.matches(".deleteBtn")) {
+        const recordId = e.target.getAttribute("data-id");
+
+        // Delete the record from Firestore
+        const docRef = doc(db, "medical_records", recordId);
+        await deleteDoc(docRef);
+
+        // Re-load the history table after deletion
+        loadHistory();
+      }
+    });
+
+    // Firebase Medicine Search Logic
     const medicineSearchInput = document.getElementById("medicineSearch");
     const resultsContainer = document.getElementById("medicineResults");
 
-    // Event listener for input field to search medicines
     medicineSearchInput.addEventListener("input", async (e) => {
       const searchTerm = e.target.value.toLowerCase();
-      
+
       if (searchTerm.trim() === "") {
         resultsContainer.innerHTML = ""; // Clear results if no search term
         return;
@@ -336,10 +380,8 @@
         }
       });
 
-      // Clear previous results
-      resultsContainer.innerHTML = "";
+      resultsContainer.innerHTML = ""; // Clear previous results
 
-      // Add each medicine to the list
       searchResults.forEach(med => {
         resultsContainer.innerHTML += `
           <a href="#" class="list-group-item list-group-item-action" data-name="${med.name}" data-mg="${med.mg}" data-price="${med.price}">
@@ -349,7 +391,6 @@
       });
     });
 
-    // Event delegation for handling click events on dynamically created medicine items
     resultsContainer.addEventListener("click", function (e) {
       if (e.target && e.target.matches(".list-group-item")) {
         const name = e.target.getAttribute("data-name");
@@ -357,14 +398,13 @@
         const price = parseFloat(e.target.getAttribute("data-price"));
 
         addMedicineToList(name, mg, price);
-        
-        // Clear the search input and results after selection
+
+        // Clear search results
         medicineSearchInput.value = "";
         resultsContainer.innerHTML = "";
       }
     });
 
-    // Function to add selected medicine to the selectedMedicines list
     function addMedicineToList(name, mg, price) {
       const newMedicine = { name, mg, price, quantity: 1, total: price };
       selectedMedicinesList.push(newMedicine);
