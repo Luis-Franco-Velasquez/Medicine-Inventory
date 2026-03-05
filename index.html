@@ -1,277 +1,408 @@
-<script type="module">
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Medical Mission System</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <style>
+    .medicine-item {
+      margin-bottom: 10px;
+      padding: 10px;
+      border: 1px solid #ddd;
+      border-radius: 6px;
+      background: #f8f9fa;
+    }
 
-  // Firebase Configuration
-  const firebaseConfig = {
-    apiKey: "AIzaSyDkuo0jjGYIBC1MKOWD42XvcB4nWy_72qQ",
-    authDomain: "medicine-inventory-cc500.firebaseapp.com",
-    projectId: "medicine-inventory-cc500",
-    storageBucket: "medicine-inventory-cc500.appspot.com",
-    messagingSenderId: "1044916941588",
-    appId: "1:1044916941588:web:ef2a8ee26f23b24d07c801"
-  };
+    .reminder {
+      background: #fff3cd;
+      color: #856404;
+      padding: 10px;
+      border-radius: 5px;
+      margin-bottom: 10px;
+    }
 
-  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-  import { getFirestore, collection, getDocs, doc, addDoc, updateDoc, deleteDoc, getDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+    #selectedMedicines {
+      max-height: 250px;
+      overflow-y: auto;
+    }
 
-  const app = initializeApp(firebaseConfig);
-  const db = getFirestore(app);
+    #medicineResults {
+      z-index: 1000;
+    }
+  </style>
+</head>
+<body class="container py-4">
 
-  let selectedMedicinesList = [];
-  let currentCollection = "";
-  const historyTable = document.getElementById("history");
-  const summaryList = document.getElementById("summaryList");
-  const medicineType = document.getElementById("medicineType");
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <h2>Medical Mission System</h2>
+    <a href="inventory.html" class="btn btn-success">View Inventory</a>
+  </div>
 
-  medicineType.addEventListener("change", () => {
-    currentCollection = medicineType.value === "Adult" ? "adult_medicine" : "pedia_medicine";
-    selectedMedicinesList = [];
-    renderSelectedMedicines();
-  });
+  <div id="reminderBox"></div>
+  <button class="btn btn-primary mb-3" onclick="backupDatabase()">Backup Database</button>
+  <div id="backupStatus" class="text-success mb-3"></div>
 
-  function renderSelectedMedicines() {
-    const container = document.getElementById("selectedMedicines");
-    container.innerHTML = "";
-    let total = 0;
+  <!-- SUMMARY -->
+  <div class="card p-3 mb-4">
+    <h5>Total Patients per Barangay</h5>
+    <ul id="summaryList" class="list-group"></ul>
+  </div>
 
-    selectedMedicinesList.forEach((med, index) => {
-      total += med.total;
+  <!-- FORM -->
+  <div class="card p-3 mb-4">
+    <input type="hidden" id="editId">
 
-      container.innerHTML += `
-        <div class="medicine-item">
-          <div class="row">
-            <div class="col-12 mb-2">
-              <strong>${med.name} - ${med.mg}</strong>
-            </div>
-            <div class="col-md-3 col-6">
-              <label class="small">Qty</label>
-              <input type="number" class="form-control form-control-sm"
-                value="${med.quantity}"
-                onchange="updateQty(${index},this.value)">
-            </div>
-            <div class="col-md-3 col-6">
-              <label class="small">Price</label>
-              <input type="number" class="form-control form-control-sm"
-                value="${med.price}"
-                onchange="updatePrice(${index},this.value)">
-            </div>
-            <div class="col-md-3 col-6">
-              <label class="small">Total</label>
-              <input type="number" class="form-control form-control-sm"
-                value="${med.total}" readonly>
-            </div>
-            <div class="col-md-3 col-6 d-flex align-items-end">
-              <button class="btn btn-danger btn-sm w-100"
-                onclick="removeMedicine(${index})">Remove</button>
+    <div class="row g-3 mb-3">
+      <div class="col-md-2">
+        <label>Date</label>
+        <input type="date" class="form-control" id="date">
+      </div>
+      <div class="col-md-3">
+        <label>Name</label>
+        <input type="text" class="form-control" id="patientName">
+      </div>
+      <div class="col-md-3">
+        <label>Barangay</label>
+        <select class="form-select" id="barangaySelect">
+          <option value="">Select Barangay</option>
+          <option>Aduas Centro</option>
+          <option>Aduas Norte</option>
+          <option>Aduas Sur</option>
+          <option>Barrera</option>
+          <option>Cantarilla</option>
+          <option>Cruz Roja</option>
+          <option>Daan Sarile</option>
+          <option>Dimasalang</option>
+          <option>D.S. Garcia</option>
+          <option>Gen. Luna</option>
+          <option>Imelda</option>
+          <option>Isla</option>
+          <option>M.S. Garcia</option>
+          <option>Nabao</option>
+          <option>Obrero</option>
+          <option>Pagas</option>
+          <option>Pag-Asa</option>
+          <option>San Juan Acffa</option>
+          <option>San Roque Norte</option>
+          <option>San Roque Sur</option>
+          <option>Sanbermicristi</option>
+          <option>Sumacab Este</option>
+          <option>Valdefuente</option>
+        </select>
+      </div>
+      <div class="col-md-2">
+        <label>Block Leader</label>
+        <input type="text" class="form-control" id="blockLeader">
+      </div>
+    </div>
+
+    <div class="row g-3 mb-3">
+      <div class="col-md-4">
+        <label>Problem</label>
+        <input type="text" class="form-control" id="problem">
+      </div>
+      <div class="col-md-2">
+        <label>Type</label>
+        <select class="form-select" id="medicineType">
+          <option value="">Select Type</option>
+          <option>Adult</option>
+          <option>Pedia</option>
+        </select>
+      </div>
+      <div class="col-md-6">
+        <label>Search Medicine</label>
+        <input type="text" class="form-control" id="medicineSearch" placeholder="Search medicine...">
+        <div id="medicineResults" class="list-group position-absolute w-100"></div>
+      </div>
+    </div>
+
+    <div id="selectedMedicines" class="mb-2"></div>
+    <div class="text-end mb-3">
+      <strong>Total: ₱<span id="grandTotal">0.00</span></strong>
+    </div>
+
+    <div class="text-end">
+      <button class="btn btn-primary me-2" id="saveBtn">Save</button>
+      <button class="btn btn-secondary" id="cancelEditBtn" style="display:none;">Cancel Edit</button>
+    </div>
+
+  </div>
+
+  <!-- FILTER -->
+  <div class="mb-3">
+    <label>Filter by Barangay</label>
+    <select class="form-select w-25" id="filterBarangay">
+      <option value="">All</option>
+      <option>Aduas Centro</option>
+      <option>Aduas Norte</option>
+      <option>Aduas Sur</option>
+      <option>Barrera</option>
+      <option>Cantarilla</option>
+      <option>Cruz Roja</option>
+      <option>Daan Sarile</option>
+      <option>Dimasalang</option>
+      <option>D.S. Garcia</option>
+      <option>Gen. Luna</option>
+      <option>Imelda</option>
+      <option>Isla</option>
+      <option>M.S. Garcia</option>
+      <option>Nabao</option>
+      <option>Obrero</option>
+      <option>Pagas</option>
+      <option>Pag-Asa</option>
+      <option>San Juan Acffa</option>
+      <option>San Roque Norte</option>
+      <option>San Roque Sur</option>
+      <option>Sanbermicristi</option>
+      <option>Sumacab Este</option>
+      <option>Valdefuente</option>
+    </select>
+    <button class="btn btn-warning mt-2" id="exportBtn">Export Filtered</button>
+  </div>
+
+  <div class="table-responsive">
+    <table class="table table-bordered table-striped">
+      <thead class="table-dark">
+        <tr>
+          <th>Date</th>
+          <th>Name</th>
+          <th>Barangay</th>
+          <th>BlockLeader</th>
+          <th>Type</th>
+          <th>Problem</th>
+          <th>Medicines</th>
+          <th>Total</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody id="history"></tbody>
+    </table>
+  </div>
+
+  <script type="module">
+
+    // Firebase Configuration
+    const firebaseConfig = {
+      apiKey: "AIzaSyDkuo0jjGYIBC1MKOWD42XvcB4nWy_72qQ",
+      authDomain: "medicine-inventory-cc500.firebaseapp.com",
+      projectId: "medicine-inventory-cc500",
+      storageBucket: "medicine-inventory-cc500.appspot.com",
+      messagingSenderId: "1044916941588",
+      appId: "1:1044916941588:web:ef2a8ee26f23b24d07c801"
+    };
+
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+    import { getFirestore, collection, getDocs, doc, addDoc, updateDoc, deleteDoc, getDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+
+    let selectedMedicinesList = [];
+    let currentCollection = "";
+    const historyTable = document.getElementById("history");
+    const summaryList = document.getElementById("summaryList");
+    const medicineType = document.getElementById("medicineType");
+
+    medicineType.addEventListener("change", () => {
+      currentCollection = medicineType.value === "Adult" ? "adult_medicine" : "pedia_medicine";
+      selectedMedicinesList = [];
+      renderSelectedMedicines();
+    });
+
+    function renderSelectedMedicines() {
+      const container = document.getElementById("selectedMedicines");
+      container.innerHTML = "";
+      let total = 0;
+
+      selectedMedicinesList.forEach((med, index) => {
+        total += med.total;
+
+        container.innerHTML += `
+          <div class="medicine-item">
+            <div class="row">
+              <div class="col-12 mb-2">
+                <strong>${med.name} - ${med.mg}</strong>
+              </div>
+              <div class="col-md-3 col-6">
+                <label class="small">Qty</label>
+                <input type="number" class="form-control form-control-sm"
+                  value="${med.quantity}"
+                  onchange="updateQty(${index},this.value)">
+              </div>
+              <div class="col-md-3 col-6">
+                <label class="small">Price</label>
+                <input type="number" class="form-control form-control-sm"
+                  value="${med.price}"
+                  onchange="updatePrice(${index},this.value)">
+              </div>
+              <div class="col-md-3 col-6">
+                <label class="small">Total</label>
+                <input type="number" class="form-control form-control-sm"
+                  value="${med.total}" readonly>
+              </div>
+              <div class="col-md-3 col-6 d-flex align-items-end">
+                <button class="btn btn-danger btn-sm w-100"
+                  onclick="removeMedicine(${index})">Remove</button>
+              </div>
             </div>
           </div>
-        </div>
-      `;
-    });
+        `;
+      });
 
-    document.getElementById("grandTotal").textContent = total.toFixed(2);
-  }
-
-  window.updateQty = (i, val) => {
-    val = parseInt(val);
-    selectedMedicinesList[i].quantity = val;
-    selectedMedicinesList[i].total = val * selectedMedicinesList[i].price;
-    renderSelectedMedicines();
-  };
-
-  window.updatePrice = (i, val) => {
-    val = parseFloat(val);
-    selectedMedicinesList[i].price = val;
-    selectedMedicinesList[i].total = val * selectedMedicinesList[i].quantity;
-    renderSelectedMedicines();
-  };
-
-  window.removeMedicine = (i) => {
-    selectedMedicinesList.splice(i, 1);
-    renderSelectedMedicines();
-  };
-
-  async function loadHistory() {
-    const snapshot = await getDocs(collection(db, "medical_records"));
-    historyTable.innerHTML = "";
-    const counts = {};
-
-    snapshot.forEach(docSnap => {
-      const d = docSnap.data();
-      counts[d.barangay] = (counts[d.barangay] || 0) + 1;
-
-      const meds = d.medicines.map(m => `${m.name} (Qty:${m.quantity})`).join(", ");
-
-      historyTable.innerHTML += `
-        <tr>
-          <td>${d.date}</td>
-          <td>${d.patientName}</td>
-          <td>${d.barangay}</td>
-          <td>${d.blockLeader}</td>
-          <td>${d.medicineType}</td>
-          <td>${d.problem}</td>
-          <td>${meds}</td>
-          <td>${d.total}</td>
-          <td>
-            <button class="btn btn-warning btn-sm editBtn" data-id="${docSnap.id}">Edit</button>
-            <button class="btn btn-danger btn-sm deleteBtn" data-id="${docSnap.id}">Delete</button>
-          </td>
-        </tr>
-      `;
-    });
-
-    summaryList.innerHTML = "";
-    for (const b in counts) {
-      summaryList.innerHTML += `
-        <li class="list-group-item d-flex justify-content-between">
-          ${b}
-          <span class="badge bg-primary">${counts[b]}</span>
-        </li>
-      `;
+      document.getElementById("grandTotal").textContent = total.toFixed(2);
     }
-  }
 
-  loadHistory();
+    window.updateQty = (i, val) => {
+      val = parseInt(val);
+      selectedMedicinesList[i].quantity = val;
+      selectedMedicinesList[i].total = val * selectedMedicinesList[i].price;
+      renderSelectedMedicines();
+    };
 
-  // Event delegation for Edit and Delete buttons
-  historyTable.addEventListener("click", async (e) => {
-    if (e.target && e.target.matches(".editBtn")) {
-      const recordId = e.target.getAttribute("data-id");
+    window.updatePrice = (i, val) => {
+      val = parseFloat(val);
+      selectedMedicinesList[i].price = val;
+      selectedMedicinesList[i].total = val * selectedMedicinesList[i].quantity;
+      renderSelectedMedicines();
+    };
 
-      // Fetch the medical record by ID from Firestore
-      const docRef = doc(db, "medical_records", recordId);
-      const docSnap = await getDoc(docRef);
+    window.removeMedicine = (i) => {
+      selectedMedicinesList.splice(i, 1);
+      renderSelectedMedicines();
+    };
 
-      if (docSnap.exists()) {
-        const data = docSnap.data();
+    async function loadHistory() {
+      const snapshot = await getDocs(collection(db, "medical_records"));
+      historyTable.innerHTML = "";
+      const counts = {};
 
-        // Fill the form with the existing data for editing
-        document.getElementById("editId").value = docSnap.id;
-        document.getElementById("date").value = data.date;
-        document.getElementById("patientName").value = data.patientName;
-        document.getElementById("barangaySelect").value = data.barangay;
-        document.getElementById("blockLeader").value = data.blockLeader;
-        document.getElementById("problem").value = data.problem;
-        document.getElementById("medicineType").value = data.medicineType;
+      snapshot.forEach(docSnap => {
+        const d = docSnap.data();
+        counts[d.barangay] = (counts[d.barangay] || 0) + 1;
 
-        // Pre-populate selected medicines list
-        selectedMedicinesList = data.medicines;
-        renderSelectedMedicines();
+        const meds = d.medicines.map(m => `${m.name} (Qty:${m.quantity})`).join(", ");
 
-        document.getElementById("cancelEditBtn").style.display = "inline";
-        document.getElementById("saveBtn").style.display = "inline";
+        historyTable.innerHTML += `
+          <tr>
+            <td>${d.date}</td>
+            <td>${d.patientName}</td>
+            <td>${d.barangay}</td>
+            <td>${d.blockLeader}</td>
+            <td>${d.medicineType}</td>
+            <td>${d.problem}</td>
+            <td>${meds}</td>
+            <td>${d.total}</td>
+            <td>
+              <button class="btn btn-warning btn-sm editBtn" data-id="${docSnap.id}">Edit</button>
+              <button class="btn btn-danger btn-sm deleteBtn" data-id="${docSnap.id}">Delete</button>
+            </td>
+          </tr>
+        `;
+      });
+
+      summaryList.innerHTML = "";
+      for (const b in counts) {
+        summaryList.innerHTML += `
+          <li class="list-group-item d-flex justify-content-between">
+            ${b}
+            <span class="badge bg-primary">${counts[b]}</span>
+          </li>
+        `;
       }
     }
 
-    if (e.target && e.target.matches(".deleteBtn")) {
-      const recordId = e.target.getAttribute("data-id");
-
-      // Delete the record from Firestore
-      const docRef = doc(db, "medical_records", recordId);
-      await deleteDoc(docRef);
-
-      // Re-load the history table after deletion
-      loadHistory();
-    }
-  });
-
-  // Firebase Medicine Search Logic
-  const medicineSearchInput = document.getElementById("medicineSearch");
-  const resultsContainer = document.getElementById("medicineResults");
-
-  medicineSearchInput.addEventListener("input", async (e) => {
-    const searchTerm = e.target.value.toLowerCase();
-
-    if (searchTerm.trim() === "") {
-      resultsContainer.innerHTML = ""; // Clear results if no search term
-      return;
-    }
-
-    // Fetching medicine data from Firestore
-    const snapshot = await getDocs(collection(db, currentCollection));
-    const searchResults = [];
-
-    snapshot.forEach(docSnap => {
-      const data = docSnap.data();
-      if (data.name.toLowerCase().includes(searchTerm)) {
-        searchResults.push(data);
-      }
-    });
-
-    resultsContainer.innerHTML = ""; // Clear previous results
-
-    searchResults.forEach(med => {
-      resultsContainer.innerHTML += `
-        <a href="#" class="list-group-item list-group-item-action" data-name="${med.name}" data-mg="${med.mg}" data-price="${med.price}">
-          ${med.name} (${med.mg}) - ₱${med.price}
-        </a>
-      `;
-    });
-  });
-
-  resultsContainer.addEventListener("click", function (e) {
-    if (e.target && e.target.matches(".list-group-item")) {
-      const name = e.target.getAttribute("data-name");
-      const mg = e.target.getAttribute("data-mg");
-      const price = parseFloat(e.target.getAttribute("data-price"));
-
-      addMedicineToList(name, mg, price);
-
-      // Clear search results
-      medicineSearchInput.value = "";
-      resultsContainer.innerHTML = "";
-    }
-  });
-
-  function addMedicineToList(name, mg, price) {
-    const newMedicine = { name, mg, price, quantity: 1, total: price };
-    selectedMedicinesList.push(newMedicine);
-    renderSelectedMedicines();
-  }
-
-  // Save button functionality
-  document.getElementById("saveBtn").addEventListener("click", async () => {
-    const id = document.getElementById("editId").value;
-    const date = document.getElementById("date").value;
-    const patientName = document.getElementById("patientName").value;
-    const barangay = document.getElementById("barangaySelect").value;
-    const blockLeader = document.getElementById("blockLeader").value;
-    const problem = document.getElementById("problem").value;
-    const medicineType = document.getElementById("medicineType").value;
-
-    // Update the record in Firestore
-    const docRef = doc(db, "medical_records", id);
-    await updateDoc(docRef, {
-      date,
-      patientName,
-      barangay,
-      blockLeader,
-      problem,
-      medicineType,
-      medicines: selectedMedicinesList,
-      total: selectedMedicinesList.reduce((acc, med) => acc + med.total, 0).toFixed(2)
-    });
-
-    // Reset the form and hide the edit buttons
-    resetForm();
     loadHistory();
-  });
 
-  // Cancel Edit button functionality
-  document.getElementById("cancelEditBtn").addEventListener("click", resetForm);
+    // Event delegation for Edit and Delete buttons
+    historyTable.addEventListener("click", async (e) => {
+      if (e.target && e.target.matches(".editBtn")) {
+        const recordId = e.target.getAttribute("data-id");
 
-  function resetForm() {
-    document.getElementById("editId").value = "";
-    document.getElementById("date").value = "";
-    document.getElementById("patientName").value = "";
-    document.getElementById("barangaySelect").value = "";
-    document.getElementById("blockLeader").value = "";
-    document.getElementById("problem").value = "";
-    document.getElementById("medicineType").value = "";
-    selectedMedicinesList = [];
-    renderSelectedMedicines();
+        // Fetch the medical record by ID from Firestore
+        const docRef = doc(db, "medical_records", recordId);
+        const docSnap = await getDoc(docRef);
 
-    document.getElementById("cancelEditBtn").style.display = "none";
-    document.getElementById("saveBtn").style.display = "none";
-  }
+        if (docSnap.exists()) {
+          const data = docSnap.data();
 
-</script>
+          // Fill the form with the existing data for editing
+          document.getElementById("editId").value = docSnap.id;
+          document.getElementById("date").value = data.date;
+          document.getElementById("patientName").value = data.patientName;
+          document.getElementById("barangaySelect").value = data.barangay;
+          document.getElementById("blockLeader").value = data.blockLeader;
+          document.getElementById("problem").value = data.problem;
+          document.getElementById("medicineType").value = data.medicineType;
+
+          // Pre-populate selected medicines list
+          selectedMedicinesList = data.medicines;
+          renderSelectedMedicines();
+
+          document.getElementById("cancelEditBtn").style.display = "inline";
+          document.getElementById("saveBtn").style.display = "inline";
+        }
+      }
+
+      if (e.target && e.target.matches(".deleteBtn")) {
+        const recordId = e.target.getAttribute("data-id");
+
+        // Delete the record from Firestore
+        const docRef = doc(db, "medical_records", recordId);
+        await deleteDoc(docRef);
+
+        // Re-load the history table after deletion
+        loadHistory();
+      }
+    });
+
+    // Save button functionality
+    document.getElementById("saveBtn").addEventListener("click", async () => {
+      const id = document.getElementById("editId").value;
+      const date = document.getElementById("date").value;
+      const patientName = document.getElementById("patientName").value;
+      const barangay = document.getElementById("barangaySelect").value;
+      const blockLeader = document.getElementById("blockLeader").value;
+      const problem = document.getElementById("problem").value;
+      const medicineType = document.getElementById("medicineType").value;
+
+      // Update the record in Firestore
+      const docRef = doc(db, "medical_records", id);
+      await updateDoc(docRef, {
+        date,
+        patientName,
+        barangay,
+        blockLeader,
+        problem,
+        medicineType,
+        medicines: selectedMedicinesList,
+        total: selectedMedicinesList.reduce((acc, med) => acc + med.total, 0).toFixed(2)
+      });
+
+      // Reset the form and hide the edit buttons
+      resetForm();
+      loadHistory();
+    });
+
+    // Cancel Edit button functionality
+    document.getElementById("cancelEditBtn").addEventListener("click", resetForm);
+
+    function resetForm() {
+      document.getElementById("editId").value = "";
+      document.getElementById("date").value = "";
+      document.getElementById("patientName").value = "";
+      document.getElementById("barangaySelect").value = "";
+      document.getElementById("blockLeader").value = "";
+      document.getElementById("problem").value = "";
+      document.getElementById("medicineType").value = "";
+      selectedMedicinesList = [];
+      renderSelectedMedicines();
+
+      document.getElementById("cancelEditBtn").style.display = "none";
+      document.getElementById("saveBtn").style.display = "none";
+    }
+
+  </script>
+
+</body>
+</html>
