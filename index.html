@@ -5,7 +5,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Medical Mission System</title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
-  
   <style>
     .medicine-item {
       margin-bottom: 10px;
@@ -29,7 +28,6 @@
     }
   </style>
 </head>
-
 <body class="container py-4">
 
   <div class="d-flex justify-content-between align-items-center mb-3">
@@ -316,14 +314,18 @@
 
     // Medicine Search
     const medicineSearchInput = document.getElementById("medicineSearch");
+    const resultsContainer = document.getElementById("medicineResults");
+
+    // Event listener for input field to search medicines
     medicineSearchInput.addEventListener("input", async (e) => {
       const searchTerm = e.target.value.toLowerCase();
       
       if (searchTerm.trim() === "") {
-        document.getElementById("medicineResults").innerHTML = "";
+        resultsContainer.innerHTML = ""; // Clear results if no search term
         return;
       }
-      
+
+      // Fetching medicine data from Firestore
       const snapshot = await getDocs(collection(db, currentCollection));
       const searchResults = [];
 
@@ -334,26 +336,42 @@
         }
       });
 
-      const resultsContainer = document.getElementById("medicineResults");
+      // Clear previous results
       resultsContainer.innerHTML = "";
-      
+
+      // Add each medicine to the list
       searchResults.forEach(med => {
         resultsContainer.innerHTML += `
-          <a href="#" class="list-group-item list-group-item-action" onclick="addMedicineToList('${med.name}', '${med.mg}', ${med.price})">
+          <a href="#" class="list-group-item list-group-item-action" data-name="${med.name}" data-mg="${med.mg}" data-price="${med.price}">
             ${med.name} (${med.mg}) - ₱${med.price}
           </a>
         `;
       });
     });
 
+    // Event delegation for handling click events on dynamically created medicine items
+    resultsContainer.addEventListener("click", function (e) {
+      if (e.target && e.target.matches(".list-group-item")) {
+        const name = e.target.getAttribute("data-name");
+        const mg = e.target.getAttribute("data-mg");
+        const price = parseFloat(e.target.getAttribute("data-price"));
+
+        addMedicineToList(name, mg, price);
+        
+        // Clear the search input and results after selection
+        medicineSearchInput.value = "";
+        resultsContainer.innerHTML = "";
+      }
+    });
+
+    // Function to add selected medicine to the selectedMedicines list
     function addMedicineToList(name, mg, price) {
       const newMedicine = { name, mg, price, quantity: 1, total: price };
       selectedMedicinesList.push(newMedicine);
       renderSelectedMedicines();
-      document.getElementById("medicineSearch").value = "";
-      document.getElementById("medicineResults").innerHTML = "";
     }
 
   </script>
+
 </body>
 </html>
